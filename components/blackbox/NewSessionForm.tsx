@@ -3,7 +3,7 @@
 import { useCurrentAccount, useCurrentNetwork, useDAppKit } from "@mysten/dapp-kit-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 
 import { AgentExecutionWorkspace } from "@/components/blackbox/AgentExecutionWorkspace";
 import { AgentModeSelector } from "@/components/blackbox/AgentModeSelector";
@@ -286,6 +286,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
   const [error, setError] = useState<UserFacingError | null>(null);
   const [artifacts, setArtifacts] = useState<ExecutionArtifacts>({});
   const [executionProgress, setExecutionProgress] = useState(initialExecutionProgress);
+  const executionWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const configuredNetwork = getNetworkConfig();
   const proofContractConfigured = getSuiProofRegistryConfig().configured;
   const completedStepCount = executionProgress.filter((step) => step.status === "done").length;
@@ -853,6 +854,12 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
     setExecutionProgress(initialExecutionProgress());
     setSubmitting(true);
     setRerunning(false);
+    window.requestAnimationFrame(() => {
+      executionWorkspaceRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
     await executeFromStep("reading", {}, "run");
   }
 
@@ -1127,18 +1134,20 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         </aside>
       </section>
 
-      <AgentExecutionWorkspace
-        agentMode={agentMode}
-        error={error}
-        onRerunFromFailedStep={failedExecutionStep || rerunning ? rerunFromFailedStep : undefined}
-        proofConfigured={proofContractConfigured}
-        rerunning={rerunning}
-        running={submitting || rerunning}
-        steps={executionProgress}
-        storageMode={storageMode}
-        taskTitle={title}
-        walletAddress={walletAccount?.address}
-      />
+      <div ref={executionWorkspaceRef} className="scroll-mt-24">
+        <AgentExecutionWorkspace
+          agentMode={agentMode}
+          error={error}
+          onRerunFromFailedStep={failedExecutionStep || rerunning ? rerunFromFailedStep : undefined}
+          proofConfigured={proofContractConfigured}
+          rerunning={rerunning}
+          running={submitting || rerunning}
+          steps={executionProgress}
+          storageMode={storageMode}
+          taskTitle={title}
+          walletAddress={walletAccount?.address}
+        />
+      </div>
     </form>
   );
 }

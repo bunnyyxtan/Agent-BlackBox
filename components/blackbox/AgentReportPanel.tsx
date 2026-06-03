@@ -108,7 +108,7 @@ function formatSpecialistMarkdown(specialist: SpecialistAgentReport) {
     "## Specialist Report",
     `- Agent: ${specialist.agent}`,
     `- ${specialist.subjectLabel}: ${specialist.subject}`,
-    `- Confidence: ${specialist.confidence}`,
+    `- Confidence: ${formatStatusLabel(specialist.confidence)}`,
     `- Generated: ${formatDate(specialist.generatedAt)}`,
     `- Data sources used: ${specialist.dataSourcesUsed.join(", ") || "Sealed task prompt"}`,
     "",
@@ -137,8 +137,8 @@ function formatSpecialistMarkdown(specialist: SpecialistAgentReport) {
         ].filter(Boolean);
         return [
           `#### ${card.title}`,
-          `Severity: ${card.severity}`,
-          `Confidence: ${card.confidence}`,
+          `Severity: ${formatStatusLabel(card.severity)}`,
+          `Confidence: ${formatStatusLabel(card.confidence)}`,
           `Evidence: ${card.evidence}`,
           ...extras,
           "",
@@ -213,7 +213,7 @@ function buildMarkdownReport(session: AgentSession) {
           `- Detected chain: ${formatStatusLabel(onchain.header.detectedChain)}`,
           `- Target type: ${formatStatusLabel(onchain.header.targetType)}`,
           `- Target: ${onchain.header.target ?? "Not supplied"}`,
-          `- Confidence: ${onchain.header.confidence}`,
+          `- Confidence: ${formatStatusLabel(onchain.header.confidence)}`,
           `- Enrichment status: ${formatStatusLabel(onchain.header.enrichmentStatus)}`,
           `- Provider: ${getOnchainProviderDisplay(onchain)}`,
           `- Assumptions: ${onchain.detected.assumptions.length > 0 ? onchain.detected.assumptions.join(" ") : "None"}`,
@@ -238,7 +238,7 @@ function buildMarkdownReport(session: AgentSession) {
     userFacingFindings
       .map(
         (finding) =>
-          `### ${finding.title}\nSeverity: ${finding.severity}\nEvidence: ${finding.evidence}\n\n${finding.detail}`,
+          `### ${finding.title}\nSeverity: ${formatStatusLabel(finding.severity)}\nEvidence: ${finding.evidence}\n\n${finding.detail}`,
       )
       .join("\n\n"),
     "",
@@ -492,13 +492,13 @@ function SpecialistReportSection({ report }: { report: SpecialistAgentReport }) 
                   <span
                     className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] ${severityClasses[card.severity]}`}
                   >
-                    {card.severity}
+                    {formatStatusLabel(card.severity)}
                   </span>
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-400 [overflow-wrap:anywhere]">{card.detail}</p>
                 <div className="mt-3 flex min-w-0 flex-wrap gap-2">
                   <span className="max-w-full rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-[0.62rem] uppercase tracking-[0.12em] text-slate-400 [overflow-wrap:anywhere]">
-                    {card.confidence} confidence
+                    {formatStatusLabel(`${card.confidence} confidence`)}
                   </span>
                   {card.status && (
                     <StatusBadge status={card.status} size="sm" />
@@ -611,6 +611,21 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
   const visibleToolCalls = report ? getVisibleToolCalls(report) : [];
   const userFacingFindings = report ? getUserFacingFindings(report) : [];
   const dataSourceSummary = getDataSourceSummary(session, onchain);
+  const originalTaskFacts = [
+    { label: "Agent Mode", value: AGENT_MODE_LABELS[session.agentMode] },
+    { label: "Created", value: formatDate(session.createdAt) },
+    ...(onchain
+      ? [
+          { label: "Sui Network", value: formatStatusLabel(onchain.header.detectedChain) },
+          { label: "Sui Target", value: onchain.header.target ?? "No Sui target supplied" },
+        ]
+      : specialist
+        ? [
+            { label: "Report Type", value: formatStatusLabel(specialist.kind) },
+            { label: "Evidence Recorded", value: `${specialist.evidenceItems.length} items` },
+          ]
+        : [{ label: "Proof Network", value: formatStatusLabel(session.proof.network) }]),
+  ];
   const suiTransactionUrl = buildSuiExplorerUrl(
     "transaction",
     session.proof.transactionDigest,
@@ -668,7 +683,7 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
               onClick={() => downloadFile(`${session.id}-agent-report.json`, jsonReport, "application/json")}
             >
               <FileJson className="h-4 w-4" />
-              Download JSON
+              Report JSON
             </button>
             <button
               type="button"
@@ -676,7 +691,7 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
               onClick={() => downloadFile(`${session.id}-agent-report.md`, markdownReport, "text/markdown")}
             >
               <FileText className="h-4 w-4" />
-              Download Markdown
+              Report Markdown
             </button>
             <button type="button" className="button-secondary" onClick={handleCopyReport}>
               {copied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
@@ -719,34 +734,14 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
             </div>
           </div>
           <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-              <dt className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-slate-600">
-                Agent mode
-              </dt>
-              <dd className="mt-1 text-slate-300">{AGENT_MODE_LABELS[session.agentMode]}</dd>
-            </div>
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-              <dt className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-slate-600">
-                Created
-              </dt>
-              <dd className="mt-1 text-slate-300">{formatDate(session.createdAt)}</dd>
-            </div>
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-              <dt className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-slate-600">
-                Detected network
-              </dt>
-              <dd className="mt-1 text-slate-300 [overflow-wrap:anywhere]">
-                {formatStatusLabel(onchain?.header.detectedChain ?? session.proof.network)}
-              </dd>
-            </div>
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-              <dt className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-slate-600">
-                Detected target
-              </dt>
-              <dd className="mt-1 text-slate-300 [overflow-wrap:anywhere]">
-                {onchain?.header.target ?? "No onchain target detected"}
-              </dd>
-            </div>
+            {originalTaskFacts.map((fact) => (
+              <div key={fact.label} className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
+                <dt className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-slate-600">
+                  {fact.label}
+                </dt>
+                <dd className="mt-1 text-slate-300 [overflow-wrap:anywhere]">{fact.value}</dd>
+              </div>
+            ))}
           </dl>
           <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
             <p className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-slate-600">
@@ -826,7 +821,7 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
                     <span
                       className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] ${severityClasses[finding.severity]}`}
                     >
-                      {finding.severity}
+                      {formatStatusLabel(finding.severity)}
                     </span>
                   </div>
                   <p className="mt-2 text-xs leading-5 text-slate-400 [overflow-wrap:anywhere]">{finding.detail}</p>
@@ -1031,34 +1026,6 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
               Recheck proof
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
-          </section>
-
-          <section className="min-w-0 rounded-2xl border border-indigo-300/15 bg-indigo-300/[0.025] p-4">
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-indigo-200">
-              Export Actions
-            </p>
-            <div className="mt-3 grid gap-2">
-              <button
-                type="button"
-                className="button-secondary justify-center"
-                onClick={() => downloadFile(`${session.id}-agent-report.json`, jsonReport, "application/json")}
-              >
-                <FileJson className="h-4 w-4" />
-                Download JSON
-              </button>
-              <button
-                type="button"
-                className="button-secondary justify-center"
-                onClick={() => downloadFile(`${session.id}-agent-report.md`, markdownReport, "text/markdown")}
-              >
-                <FileText className="h-4 w-4" />
-                Download Markdown
-              </button>
-              <button type="button" className="button-secondary justify-center" onClick={handleCopyReport}>
-                {copied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
-                {copied ? "Copied" : "Copy Report"}
-              </button>
-            </div>
           </section>
 
         </aside>

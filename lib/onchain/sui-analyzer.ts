@@ -85,6 +85,7 @@ function inferSymbol(coinType: string, metadata: unknown) {
 
 function inferDecimals(coinType: string, metadata: unknown) {
   if (coinType === SUI_COIN_TYPE) return 9;
+  if (/::wal::wal$/i.test(coinType)) return 9;
   return isRecord(metadata) ? readNumber(metadata.decimals, 0) : 0;
 }
 
@@ -125,6 +126,12 @@ function buildTokenBalances(
       name: inferName(symbol, metadata),
       formattedBalance: formatBalance(item.totalBalance, decimals),
     };
+  }).sort((left, right) => {
+    if (left.symbol === "SUI") return -1;
+    if (right.symbol === "SUI") return 1;
+    if (left.symbol === "WAL") return -1;
+    if (right.symbol === "WAL") return 1;
+    return left.symbol.localeCompare(right.symbol);
   });
 }
 
@@ -133,6 +140,23 @@ function summarizeBalances(tokenBalances: SuiTokenBalance[]) {
   return tokenBalances
     .map((balance) => `${balance.formattedBalance} ${balance.symbol}`)
     .join(", ");
+}
+
+function formatNetworkLabel(network: string) {
+  if (/mainnet/i.test(network)) return "Mainnet";
+  if (/testnet/i.test(network)) return "Testnet";
+  if (/devnet/i.test(network)) return "Devnet";
+  return network;
+}
+
+function formatTargetLabel(targetType: string) {
+  const labels: Record<string, string> = {
+    sui_wallet: "Sui wallet",
+    sui_transaction: "Sui transaction",
+    sui_object: "Sui object",
+    sui_package: "Sui package",
+  };
+  return labels[targetType] ?? targetType.replace(/_/g, " ");
 }
 
 function buildRiskSignals({
@@ -198,7 +222,8 @@ export async function analyzeSuiTarget(detected: OnchainDetectedTarget): Promise
       ? "partial"
       : "live"
     : "failed";
-  const targetLabel = detected.targetType.replace(/_/g, " ");
+  const targetLabel = formatTargetLabel(detected.targetType);
+  const networkLabel = formatNetworkLabel(detected.network);
   const transactionDetails = rpcSummary.transactionDetails ?? [];
   const riskSignals = buildRiskSignals({ transactionDetails, liveSections, tokenBalances });
   const firstChangeCounts = readChangeCounts(transactionDetails[0]);
@@ -241,7 +266,7 @@ export async function analyzeSuiTarget(detected: OnchainDetectedTarget): Promise
   return {
     header: {
       agent: "Sui Onchain Analyzer",
-      detectedChain: `Sui ${detected.network}`,
+      detectedChain: `Sui ${networkLabel}`,
       targetType: detected.targetType,
       target: detected.target,
       confidence: detected.confidence,
@@ -257,12 +282,12 @@ export async function analyzeSuiTarget(detected: OnchainDetectedTarget): Promise
     dataSources,
     executiveSummary:
       liveSections.length > 0
-        ? `Analyzed ${targetLabel} on Sui ${detected.network} using Sui JSON-RPC. ${detected.targetType === "sui_wallet" ? `Wallet holdings: ${balanceSummary}` : "Target details were read where available."}`
+        ? `Analyzed ${targetLabel} on Sui ${networkLabel} using Sui JSON-RPC. ${detected.targetType === "sui_wallet" ? `Wallet holdings: ${balanceSummary}` : "Target details were read where available."}`
         : `Prepared a Sui report for ${targetLabel}, but public RPC did not return usable live data for this target.`,
     targetProfile: [
       `Target: ${detected.target ?? "Not supplied"}`,
       `Target type: ${detected.targetType}`,
-      `Network: Sui ${detected.network}`,
+      `Network: Sui ${networkLabel}`,
       `Provider: Sui JSON-RPC (${rpcUrl})`,
       detected.targetType === "sui_wallet"
         ? `Token holdings: ${balanceSummary}`

@@ -561,13 +561,18 @@ function buildRiskReview(input: ReportInput, context: TaskContext, generatedAt: 
 
 function extractDeliverables(prompt: string) {
   const lines = prompt.split(/\r?\n/).map((line) => line.trim());
+  const cleanItem = (item: string) =>
+    item
+      .replace(/\.\s*(?:create|generate|produce|prepare|write)\b[\s\S]*$/i, "")
+      .trim();
   const bullets = lines
     .filter((line) => /^[-*]\s+/.test(line))
-    .map((line) => line.replace(/^[-*]\s+/, "").trim());
+    .map((line) => cleanItem(line.replace(/^[-*]\s+/, "")))
+    .filter(Boolean);
   if (bullets.length > 0) return bullets;
   const delivered = prompt.match(/\bdelivered:\s*([\s\S]+)/i)?.[1];
   if (delivered) {
-    return delivered.split(/[,;\n]/).map((item) => item.trim()).filter(Boolean).slice(0, 8);
+    return delivered.split(/[,;\n]/).map(cleanItem).filter(Boolean).slice(0, 8);
   }
   return [truncate(prompt, 140)];
 }
@@ -694,8 +699,11 @@ export function isSpecialistAgentReport(value: unknown): value is SpecialistAgen
 export function formatSpecialistFinalOutput(report: SpecialistAgentReport) {
   const headline = report.cards[0]?.detail ?? `${report.agent} completed ${report.kind.replace(/_/g, " ")}.`;
   const keySections = report.sections
-    .slice(0, 4)
-    .map((section) => `${section.title}: ${section.items.slice(0, 3).join(" ")}`)
+    .slice(0, 5)
+    .map((section) => {
+      const items = section.items.slice(0, 8).map((item) => `- ${item}`).join("\n");
+      return `${section.title}:\n${items}`;
+    })
     .join("\n\n");
   const next = report.recommendedNextActions.slice(0, 3).map((item) => `- ${item}`).join("\n");
   return [
