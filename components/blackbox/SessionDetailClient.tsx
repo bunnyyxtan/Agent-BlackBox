@@ -202,7 +202,9 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
               <p className="eyebrow">Replay Evidence</p>
               <h2 className="mt-2 text-base font-semibold text-white">Forensic Timeline</h2>
             </div>
-            <span className="font-mono text-xs text-slate-600">12 events</span>
+            <span className="font-mono text-xs text-slate-600">
+              {session.trace.timeline.length} events
+            </span>
           </div>
           <div className="mt-6">
             <TraceTimeline items={session.trace.timeline} />

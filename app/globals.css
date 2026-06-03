@@ -2,14 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Root variables ──────────────────────────────────── */
+/* Root variables */
 :root {
   color-scheme: dark;
   --mouse-x: 50vw;
   --mouse-y: 50vh;
 }
 
-/* ── Base reset ──────────────────────────────────────── */
+/* Base reset */
 * {
   box-sizing: border-box;
 }
@@ -38,12 +38,12 @@ select {
   font: inherit;
 }
 
-/* ── Selection ───────────────────────────────────────── */
+/* Selection */
 ::selection {
   background: rgba(120, 120, 255, 0.25);
 }
 
-/* ── Custom scrollbar ────────────────────────────────── */
+/* Custom scrollbar */
 body::-webkit-scrollbar {
   width: 8px;
 }
@@ -55,7 +55,7 @@ body::-webkit-scrollbar-thumb {
   border-radius: 4px;
 }
 
-/* ── Ambient background glow (fixed behind everything) ─ */
+/* Ambient background glow, fixed behind everything */
 body::before {
   content: "";
   position: fixed;
@@ -70,9 +70,7 @@ body::before {
   background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
 }
 
-/* ─────────────────────────────────────────────────────
-   Utility classes from the HTML design system
-   ───────────────────────────────────────────────────── */
+/* Utility classes from the HTML design system */
 
 /* Scroll-reveal: starts hidden, add `.in` via IntersectionObserver */
 .reveal {
@@ -87,7 +85,7 @@ body::before {
   transform: translateY(0);
 }
 
-/* Gradient text (white → lavender → indigo) */
+/* Gradient text: white to lavender to indigo */
 .gradient-text {
   background: linear-gradient(135deg, #fff 0%, #a5a5d4 60%, #6366f1 100%);
   -webkit-background-clip: text;
@@ -176,9 +174,7 @@ body::before {
   }
 }
 
-/* ─────────────────────────────────────────────────────
-   Component layer — reusable project classes
-   ───────────────────────────────────────────────────── */
+/* Component layer: reusable project classes */
 @layer components {
   .page-container {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10;
@@ -197,12 +193,12 @@ body::before {
     @apply text-sm leading-6 text-zinc-500 font-light;
   }
 
-  /* Primary CTA — white pill */
+  /* Primary CTA: white pill */
   .button-primary {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-medium text-zinc-900 transition-all hover:shadow-[0_0_40px_-5px_rgba(255,255,255,0.6)];
   }
 
-  /* Secondary CTA — border pill */
+  /* Secondary CTA: border pill */
   .button-secondary {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/10 bg-transparent px-7 py-3.5 text-sm font-light text-zinc-300 transition-all hover:border-white/20 hover:bg-white/[0.03];
   }

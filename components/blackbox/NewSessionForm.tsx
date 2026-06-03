@@ -929,9 +929,9 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
           <GlassCard className="p-5 sm:p-8">
             <div>
               <p className="mb-2 font-mono text-xs uppercase tracking-widest text-indigo-400">Agent Task</p>
-              <h2 className="text-xl font-medium tracking-tight text-white">Agent parameters</h2>
+              <h2 className="text-xl font-medium tracking-tight text-white">Session brief</h2>
               <p className="mt-2 text-sm font-light text-zinc-400">
-                Capture the intent and evidence context before the session is sealed.
+                Define the task the agent will execute, seal, store, and verify.
               </p>
             </div>
             <div className="mt-8 space-y-6">
@@ -943,7 +943,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
                   required
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Review autonomous settlement exception"
+                  placeholder="Research Walrus trace storage"
                   className="w-full rounded-xl border border-white/10 bg-[#050507] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
                 />
               </label>
@@ -956,7 +956,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
                   rows={4}
                   value={prompt}
                   onChange={(event) => setPrompt(event.target.value)}
-                  placeholder="Record the decision path, inspect the attached evidence metadata, and generate an auditable operator summary."
+                  placeholder="Explain how Walrus can store sealed Agent BlackBox traces, support readback verification, and preserve evidence for independent replay."
                   className="min-h-36 w-full resize-y rounded-xl border border-white/10 bg-[#050507] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
                 />
               </label>

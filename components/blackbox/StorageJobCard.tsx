@@ -188,7 +188,7 @@ export function StorageJobCard({
           <iconify-icon icon="solar:eye-line-duotone" />
           {action === "status" ? "Checking..." : "View Status"}
         </button>
-        <CopyButton value={job.uploadJobId} label="Copy ID" />
+        <CopyButton value={job.uploadJobId} label="Copy Upload ID" />
         <button type="button" onClick={directRead} disabled={Boolean(action)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white transition hover:border-indigo-400/40 hover:bg-indigo-400/10 disabled:cursor-wait disabled:opacity-55">
           <iconify-icon icon="solar:download-minimalistic-line-duotone" />
           {action === "read" ? "Reading..." : "Direct Read"}
@@ -196,10 +196,6 @@ export function StorageJobCard({
         <button type="button" onClick={verifyBlob} disabled={Boolean(action)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white transition hover:border-indigo-400/40 hover:bg-indigo-400/10 disabled:cursor-wait disabled:opacity-55">
           <iconify-icon icon="solar:shield-check-line-duotone" />
           {action === "verify" ? "Verifying..." : "Verify Blob"}
-        </button>
-        <button type="button" disabled title="Direct Walrus renewal controls require a later signed lifecycle flow." className="flex min-h-11 cursor-not-allowed items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white opacity-55">
-          <iconify-icon icon="solar:close-circle-line-duotone" />
-          Coming later
         </button>
       </div>
       {message && <p className="mt-4 text-xs leading-5 text-amber-100/75">{message}</p>}

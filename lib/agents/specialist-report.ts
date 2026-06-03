@@ -463,7 +463,7 @@ function buildRiskReview(input: ReportInput, context: TaskContext, generatedAt: 
     ["security", /\b(wallet|key|secret|signature|auth|abuse|attack|exposed)\b/i, "High"],
     ["operational", /\b(upload|relay|failure|approval|process|runbook|retry|timeout)\b/i, "Medium"],
     ["financial", /\b(cost|gas|sui|wal|payment|fund|fee|charge)\b/i, "Medium"],
-    ["data quality", /\b(fake|verification|hash|trace|evidence|source|missing|incorrect)\b/i, "High"],
+    ["data quality", /\b(false|unsupported|verification|hash|trace|evidence|source|missing|incorrect)\b/i, "High"],
     ["user trust", /\b(public|demo|judge|trust|reputation|claim|confusing)\b/i, "High"],
     ["proof integrity", /\b(anchor|proof|walrus|hash|tamper|readback|mismatch)\b/i, "Critical"],
   ] as const;
@@ -525,7 +525,9 @@ function buildRiskReview(input: ReportInput, context: TaskContext, generatedAt: 
       {
         title: "Red Flags",
         items: [
-          lower.includes("fake") ? "The prompt explicitly flags fake verification states as a risk." : "Any proof success state not backed by Walrus readback and Sui verification is a red flag.",
+          lower.includes("false") || lower.includes("unsupported")
+            ? "The prompt explicitly flags unsupported verification states as a risk."
+            : "Any proof success state not backed by Walrus readback and Sui verification is a red flag.",
           lower.includes("public") || lower.includes("demo") ? "Public demo exposure means API abuse and prompt leakage must be controlled." : "Public deployment details were not fully specified.",
           lower.includes("walrus") ? "Walrus upload/retry failures must show clean recovery without claiming storage success." : "Storage failure mode should be checked before external demo.",
         ],
@@ -551,7 +553,7 @@ function buildRiskReview(input: ReportInput, context: TaskContext, generatedAt: 
       "Attach deployment logs, endpoint configs, and failure screenshots for higher-confidence review.",
     ],
     recommendedNextActions: [
-      "Fix any fake success state before judging.",
+      "Fix any unsupported success state before judging.",
       "Run the public demo flow from a fresh browser profile.",
       "Export the sealed report after Walrus and Sui proof steps complete.",
     ],

@@ -42,6 +42,13 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
     verificationPresentation.state === "tampered"
       ? "Canonical trace hash mismatch"
       : session.trace.traceHash;
+  const expiryStatus = localOnly
+    ? "Prepared"
+    : session.storage.storageStatus === "expired"
+      ? "Expired"
+      : session.storage.noRenewal
+        ? "Cancelled"
+        : "Active";
   const baseItems: Array<{
     detail: string;
     icon: string;
@@ -66,7 +73,7 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
       icon: "solar:fingerprint-line-duotone",
       detail: hashDetail,
     },
-    { label: "Expiry / Renewal", status: localOnly ? "Prepared" : "Active", icon: "solar:history-line-duotone", detail: session.storage.expiryDate, protocol: "walrus" },
+    { label: "Expiry / Renewal", status: expiryStatus, icon: "solar:history-line-duotone", detail: session.storage.expiryDate, protocol: "walrus" },
   ];
   const items = shouldShowTatumRpcCard(session)
     ? [
