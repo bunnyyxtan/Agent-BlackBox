@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorPayload, BODY_SIZE_LIMITS, readJsonRequest, SafeRequestError, safeRequestErrorPayload } from "@/lib/http/safe-request";
+import { guardApiRequest } from "@/lib/security/api-guard";
 import { getSessionById } from "@/lib/session-service";
 import { isValidTransactionDigest } from "@/lib/sui-client-helpers";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
@@ -19,21 +21,34 @@ interface VerifyProofRequest {
   eventType?: unknown;
 }
 
+export const runtime = "nodejs";
+
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as VerifyProofRequest | null;
+  const guard = await guardApiRequest(request, { profile: "standard" });
+  if (guard) return guard;
+
+  let body: VerifyProofRequest | null = null;
+  try {
+    body = await readJsonRequest<VerifyProofRequest>(request, { maxBytes: BODY_SIZE_LIMITS.normalJson });
+  } catch (error) {
+    if (error instanceof SafeRequestError) {
+      return NextResponse.json(safeRequestErrorPayload(error), { status: error.statusCode });
+    }
+    throw error;
+  }
   if (!body) {
-    return NextResponse.json({ error: "A JSON proof verification body is required." }, { status: 400 });
+    return NextResponse.json(apiErrorPayload("INVALID_JSON", "A JSON proof verification body is required."), { status: 400 });
   }
 
   const sessionId = readString(body.sessionId);
   const session = sessionId ? await getSessionById(sessionId) : undefined;
   const proofRegistry = getSuiProofRegistryConfig();
   if (sessionId && !session) {
-    return NextResponse.json({ error: "Session not found." }, { status: 404 });
+    return NextResponse.json(apiErrorPayload("SESSION_NOT_FOUND", "Session not found."), { status: 404 });
   }
 
   const proofObjectId =
@@ -63,7 +78,7 @@ export async function POST(request: Request) {
     (anchored && !expectedOwner)
   ) {
     return NextResponse.json(
-      { error: "Proof references and expected evidence hashes are required." },
+      apiErrorPayload("PROOF_REFERENCES_REQUIRED", "Proof references and expected evidence hashes are required."),
       { status: 400 },
     );
   }
@@ -77,6 +92,8 @@ export async function POST(request: Request) {
         (session?.proof.packageId !== "package-id-pending" ? session?.proof.packageId : undefined) ??
         proofRegistry.packageId ??
         "package-id-pending",
+      moduleName: session?.proof.moduleName ?? proofRegistry.moduleName,
+      createFunction: session?.proof.createFunction ?? proofRegistry.createFunction,
       eventType: readString(body.eventType) ?? session?.proof.eventType ?? proofRegistry.eventType,
     },
     {

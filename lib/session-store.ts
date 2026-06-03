@@ -1,7 +1,7 @@
 import type { CreateSessionInput } from "@/types/blackbox";
 
-// These records seed the Phase 1 JSON store on first run. They are not a
-// runtime fallback: unknown session IDs must remain unknown.
+// These records seed the local JSON store on first run. They are not a runtime
+// fallback: unknown session IDs must remain unknown.
 export const seedSessionInputs: CreateSessionInput[] = [
   {
     id: "abx-research-market",

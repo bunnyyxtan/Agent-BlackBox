@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { BODY_SIZE_LIMITS, readJsonRequest, SafeRequestError, safeRequestErrorPayload } from "@/lib/http/safe-request";
 import { analyzeOnchainInput } from "@/lib/onchain/analyzer-router";
+import { guardApiRequest } from "@/lib/security/api-guard";
 import type { OnchainAnalyzeRequest, OnchainAnalyzeResponse } from "@/lib/onchain/types";
 
 export const runtime = "nodejs";
@@ -33,8 +35,13 @@ function normalizeRequest(value: unknown): OnchainAnalyzeRequest {
 }
 
 export async function POST(request: Request) {
+  const guard = await guardApiRequest(request, { profile: "strict" });
+  if (guard) return guard;
+
   try {
-    const input = normalizeRequest(await request.json());
+    const input = normalizeRequest(await readJsonRequest<unknown>(request, {
+      maxBytes: BODY_SIZE_LIMITS.normalJson,
+    }));
     const report = await analyzeOnchainInput(input);
     const response: OnchainAnalyzeResponse = {
       ok: true,
@@ -44,6 +51,9 @@ export async function POST(request: Request) {
     };
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
+    if (error instanceof SafeRequestError) {
+      return NextResponse.json(safeRequestErrorPayload(error), { status: error.statusCode });
+    }
     const response: OnchainAnalyzeResponse = {
       ok: false,
       error: {

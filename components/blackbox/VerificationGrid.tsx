@@ -29,8 +29,8 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
   const networkLabel = session.proof.network === "sui-testnet" ? "Testnet" : "Mainnet";
   const localOnly = session.storage.storageProvider === "local";
   const proofRegistry = getSuiProofRegistryConfig();
-  const sampleTraceLabel = "Sample Trace";
-  const walrusLabel = localOnly ? sampleTraceLabel : `Walrus ${networkLabel}`;
+  const localTraceLabel = "Local Trace";
+  const walrusLabel = localOnly ? localTraceLabel : `Walrus ${networkLabel}`;
   const verificationPresentation = getVerificationPresentation(session);
   const hashStatus =
     verificationPresentation.state === "tampered"
@@ -50,8 +50,8 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
     status: string;
   }> = [
     { label: `${walrusLabel} Blob Storage`, status: session.storage.storageStatus, icon: "solar:database-line-duotone", detail: session.storage.uploadJobId, protocol: "walrus" },
-    { label: "Walrus Trace Blob", status: session.verification.walrusBlobAvailable ? "Available" : localOnly ? sampleTraceLabel : "Prepared", icon: "solar:cloud-storage-line-duotone", detail: session.storage.blobId, protocol: "walrus" },
-    { label: `Direct ${walrusLabel} Read`, status: session.verification.directWalrusReadPassed ? "Passed" : localOnly ? sampleTraceLabel : "Prepared", icon: "solar:scan-line-duotone", detail: "Aggregator read path", protocol: "walrus" },
+    { label: "Walrus Trace Blob", status: session.verification.walrusBlobAvailable ? "Available" : localOnly ? localTraceLabel : "Prepared", icon: "solar:cloud-storage-line-duotone", detail: session.storage.blobId, protocol: "walrus" },
+    { label: `Direct ${walrusLabel} Read`, status: session.verification.directWalrusReadPassed ? "Passed" : localOnly ? localTraceLabel : "Prepared", icon: "solar:scan-line-duotone", detail: "Aggregator read path", protocol: "walrus" },
     { label: "Walrus Network", status: networkLabel, icon: "solar:global-line-duotone", detail: formatStatusLabel(session.storage.storageNetwork ?? `walrus-${networkLabel.toLowerCase()}`), protocol: "walrus" },
     {
       label: "Sui Proof Anchor",

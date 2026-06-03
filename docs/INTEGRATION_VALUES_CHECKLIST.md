@@ -23,7 +23,7 @@ visibly unconfigured or failed.
 | `OPENAI_API_KEY` | Secret, server-only | user-provided | Agent Runtime |
 | `TATUM_API_KEY` | Secret, server-only | user-provided | Tatum Sui Mainnet RPC and Tatum MCP authentication |
 | `TATUM_SUI_RPC_URL` | Server-only | `https://sui-mainnet.gateway.tatum.io` | Proof object, transaction, and event reads |
-| `TATUM_MCP_ENABLED` | Server-only | `true` | EVM/multichain analyzer enrichment |
+| `TATUM_MCP_ENABLED` | Server-only | `false` by default | Optional EVM/multichain analyzer enrichment |
 | `TATUM_MCP_COMMAND` | Server-only | `npx` | Tatum MCP local package runner |
 | `TATUM_MCP_PACKAGE` | Server-only | `@tatumio/blockchain-mcp` | Tatum MCP package |
 | `TATUM_MCP_SERVER_NAME` | Server-only | `tatumio` | Tatum MCP server label |
@@ -108,7 +108,8 @@ SUI_NETWORK=mainnet
 OPENAI_API_KEY=<your-agent-runtime-key>
 TATUM_API_KEY=<your-tatum-api-key>
 TATUM_SUI_RPC_URL=https://sui-mainnet.gateway.tatum.io
-TATUM_MCP_ENABLED=true
+# Set to true only when EVM/multichain analysis should use Tatum MCP.
+TATUM_MCP_ENABLED=false
 TATUM_MCP_COMMAND=npx
 TATUM_MCP_PACKAGE=@tatumio/blockchain-mcp
 TATUM_MCP_SERVER_NAME=tatumio
@@ -151,10 +152,10 @@ ID. Never show Sui Mainnet while using testnet endpoints.
 | --- | --- |
 | Agent Runtime | Implemented; requires server-only runtime key |
 | Mainnet defaults | Ready |
-| Walrus SDK Upload Relay path | Implemented, requires browser wallet smoke test |
+| Walrus SDK Upload Relay path | Implemented, requires connected wallet approval |
 | Walrus Mainnet read/hash verification | Implemented through aggregator readback |
 | Tatum Sui Mainnet RPC | Configured by URL; requires server-only API key |
-| Sui Mainnet proof registry | Contract code present; package ID still required after publish |
+| Sui Mainnet proof registry | Contract code present; package ID configured for Mainnet |
 | UI honesty | Missing relay/package/wallet states are surfaced instead of reported as success |
 | Readiness panel | Settings loads readiness checks asynchronously and never prints secrets |
 

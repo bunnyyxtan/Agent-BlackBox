@@ -294,9 +294,8 @@ export interface TamperSimulationResult {
   reason: string;
 }
 
-export interface PlaceholderApiResponse<T> {
+export interface ApiSuccessResponse<T> {
   ok: true;
-  phase: "phase-1" | "phase-2a" | "phase-2b" | "phase-2c" | "phase-2d" | "phase-2e";
   message: string;
   data: T;
 }

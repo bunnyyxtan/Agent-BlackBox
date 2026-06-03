@@ -35,9 +35,10 @@ export function StorageJobCard({
     const response = await fetch(url, options);
     const payload = await readJsonResponse<{
       data?: Record<string, unknown>;
+      error?: { message?: string };
       message?: string;
     }>(response, `${options?.method ?? "GET"} ${url}`);
-    if (!response.ok) throw new Error(payload.message ?? "Storage action failed.");
+    if (!response.ok) throw new Error(payload.error?.message ?? payload.message ?? "Storage action failed.");
     return payload;
   }
 

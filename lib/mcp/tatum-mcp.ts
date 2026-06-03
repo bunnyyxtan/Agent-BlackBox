@@ -17,10 +17,14 @@ const TOOL_PROVIDER = "Tatum MCP" as const;
 const DEFAULT_PACKAGE = "@tatumio/blockchain-mcp" as const;
 const DEFAULT_SERVER_NAME = "tatumio";
 const TOOL_TIMEOUT_MS = 25_000;
+const TOOL_DISCOVERY_CACHE_TTL_MS = 30_000;
 const DEFAULT_MCP_COMMAND = "npx";
 
 let lastTatumMcpRuntimeError: string | undefined;
 let lastDiscoveredTatumMcpTools: string[] | undefined;
+let cachedTatumMcpToolDiscovery:
+  | { availableTools: string[]; checkedAt: string; expiresAt: number }
+  | undefined;
 let preferLocalEntrypointFallback = false;
 
 export type TatumMcpToolName =
@@ -59,7 +63,7 @@ interface TatumMcpConfig {
   fallbackSpawnArgs?: string[];
 }
 
-interface RunMcpToolCallParams {
+export interface RunMcpToolCallParams {
   toolName: TatumMcpToolName;
   network?: string;
   target?: string;
@@ -435,6 +439,12 @@ export async function getTatumMcpStatus(): Promise<OnchainMcpStatusSnapshot> {
 
 export async function discoverTatumMcpTools(): Promise<TatumMcpToolDiscovery> {
   const checkedAt = new Date().toISOString();
+  if (cachedTatumMcpToolDiscovery && cachedTatumMcpToolDiscovery.expiresAt > Date.now()) {
+    return {
+      availableTools: cachedTatumMcpToolDiscovery.availableTools,
+      checkedAt: cachedTatumMcpToolDiscovery.checkedAt,
+    };
+  }
   const status = await getTatumMcpStatus();
   if (status.status !== "configured") {
     return {
@@ -467,6 +477,11 @@ export async function discoverTatumMcpTools(): Promise<TatumMcpToolDiscovery> {
       return Array.from(new Set(names)).sort();
     });
     lastDiscoveredTatumMcpTools = availableTools;
+    cachedTatumMcpToolDiscovery = {
+      availableTools,
+      checkedAt,
+      expiresAt: Date.now() + TOOL_DISCOVERY_CACHE_TTL_MS,
+    };
     lastTatumMcpRuntimeError = undefined;
     return { availableTools, checkedAt };
   } catch (error) {
@@ -492,44 +507,86 @@ export async function runTatumMcpToolCall({
   args,
   sessionId,
 }: RunMcpToolCallParams): Promise<OnchainMcpToolEvidence> {
+  const [result] = await runTatumMcpToolCalls([{ toolName, network, target, args, sessionId }]);
+  return result;
+}
+
+function buildSkippedToolEvidence(
+  { toolName, network, target, args, sessionId }: RunMcpToolCallParams,
+  status: OnchainMcpStatusSnapshot,
+) {
   const startedAt = new Date().toISOString();
   const inputPayload = { provider: TOOL_PROVIDER, toolName, network, target, args, sessionId };
   const inputHash = createHashFromString(stableStringify(inputPayload));
-  const config = getTatumMcpConfig();
-  const status = await getTatumMcpStatus();
+  const completedAt = new Date().toISOString();
+  return {
+    provider: TOOL_PROVIDER,
+    packageName: DEFAULT_PACKAGE,
+    toolName,
+    ...(network ? { network } : {}),
+    ...(target ? { target } : {}),
+    status: "skipped" as const,
+    summary: getSafeErrorMessage(status.status),
+    startedAt,
+    completedAt,
+    inputHash,
+    resultUsedInReport: false,
+    error: {
+      code: "TATUM_MCP_UNAVAILABLE",
+      message: getSafeErrorMessage(status.status),
+      ...(status.details ? { details: status.details } : {}),
+    },
+  };
+}
 
-  if (status.status !== "configured") {
-    const completedAt = new Date().toISOString();
-    return {
-      provider: TOOL_PROVIDER,
-      packageName: DEFAULT_PACKAGE,
-      toolName,
-      ...(network ? { network } : {}),
-      ...(target ? { target } : {}),
-      status: "skipped",
-      summary: getSafeErrorMessage(status.status),
-      startedAt,
-      completedAt,
-      inputHash,
-      resultUsedInReport: false,
-      error: {
-        code: "TATUM_MCP_UNAVAILABLE",
-        message: getSafeErrorMessage(status.status),
-        ...(status.details ? { details: status.details } : {}),
-      },
-    };
-  }
+function buildFailedToolEvidence(
+  { toolName, network, target, args, sessionId }: RunMcpToolCallParams,
+  config: TatumMcpConfig,
+  error: unknown,
+) {
+  const startedAt = new Date().toISOString();
+  const completedAt = new Date().toISOString();
+  const inputPayload = { provider: TOOL_PROVIDER, toolName, network, target, args, sessionId };
+  const inputHash = createHashFromString(stableStringify(inputPayload));
+  const safeError = createSafeRuntimeError(error, toolName, network, target);
+  recordTatumMcpRuntimeError(safeError.details);
+  return {
+    provider: TOOL_PROVIDER,
+    packageName: config.packageName,
+    toolName,
+    ...(network ? { network } : {}),
+    ...(target ? { target } : {}),
+    status: "failed" as const,
+    summary: safeError.message,
+    startedAt,
+    completedAt,
+    inputHash,
+    resultUsedInReport: false,
+    error: {
+      code: safeError.code,
+      message: safeError.message,
+      status: safeError.status,
+      details: safeError.details,
+    },
+  };
+}
 
+async function executeTatumMcpToolCallWithClient(
+  client: Client,
+  config: TatumMcpConfig,
+  { toolName, network, target, args, sessionId }: RunMcpToolCallParams,
+): Promise<OnchainMcpToolEvidence> {
+  const startedAt = new Date().toISOString();
+  const inputPayload = { provider: TOOL_PROVIDER, toolName, network, target, args, sessionId };
+  const inputHash = createHashFromString(stableStringify(inputPayload));
   try {
-    const result = await withTatumMcpClient(TOOL_TIMEOUT_MS, (client) =>
-      client.callTool(
-        {
-          name: toolName,
-          arguments: args ?? {},
-        },
-        undefined,
-        { signal: abortAfterTimeout(TOOL_TIMEOUT_MS) },
-      ),
+    const result = await client.callTool(
+      {
+        name: toolName,
+        arguments: args ?? {},
+      },
+      undefined,
+      { signal: abortAfterTimeout(TOOL_TIMEOUT_MS) },
     );
     const completedAt = new Date().toISOString();
     const outputText = extractTextContent(result);
@@ -590,5 +647,27 @@ export async function runTatumMcpToolCall({
         details: safeError.details,
       },
     };
+  }
+}
+
+export async function runTatumMcpToolCalls(
+  calls: RunMcpToolCallParams[],
+): Promise<OnchainMcpToolEvidence[]> {
+  const status = await getTatumMcpStatus();
+  if (status.status !== "configured") {
+    return calls.map((call) => buildSkippedToolEvidence(call, status));
+  }
+
+  const config = getTatumMcpConfig();
+  try {
+    return await withTatumMcpClient(TOOL_TIMEOUT_MS, async (client) => {
+      const results: OnchainMcpToolEvidence[] = [];
+      for (const call of calls) {
+        results.push(await executeTatumMcpToolCallWithClient(client, config, call));
+      }
+      return results;
+    });
+  } catch (error) {
+    return calls.map((call) => buildFailedToolEvidence(call, config, error));
   }
 }

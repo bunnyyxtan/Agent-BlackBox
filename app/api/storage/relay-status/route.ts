@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { guardApiRequest } from "@/lib/security/api-guard";
 import { getUploadRelayTipConfig } from "@/lib/storage-adapters/walrus-sdk-relay";
 import { getWalrusConfiguration } from "@/lib/walrus";
-import type { PlaceholderApiResponse } from "@/types/blackbox";
+import type { ApiSuccessResponse } from "@/types/blackbox";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const guard = await guardApiRequest(request, { profile: "read" });
+  if (guard) return guard;
+
   const walrus = getWalrusConfiguration();
   const relayStatus = await getUploadRelayTipConfig();
   const result = {
@@ -18,9 +22,8 @@ export async function GET() {
     checkedAt: relayStatus.checkedAt,
     error: relayStatus.error,
   };
-  const response: PlaceholderApiResponse<typeof result> = {
+  const response: ApiSuccessResponse<typeof result> = {
     ok: true,
-    phase: "phase-2e",
     message: relayStatus.reachable
       ? "Walrus Mainnet upload relay tip configuration loaded."
       : "Walrus Mainnet upload relay status could not be confirmed.",

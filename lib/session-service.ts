@@ -1,6 +1,6 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   isValidSuiAddress,
@@ -23,7 +23,6 @@ import { hydrateWalrusSdkRelayStorageReference } from "@/lib/storage-adapters/wa
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
 import {
   buildLocalPhase1TatumRpcVerification,
-  getTatumSuiRpcConfig,
   verifyProofMetadata,
 } from "@/lib/tatum-rpc";
 import { createTraceBundleFromSession } from "@/lib/trace-bundle";
@@ -73,6 +72,21 @@ export interface ProofAnchorInput {
 
 export class SessionValidationError extends Error {}
 
+export interface FinalizeStorageInput {
+  uploadJobId?: string;
+  blobId?: string;
+  blobObjectId?: string;
+  objectId?: string;
+  storageEpochs?: number;
+  storageMode?: StorageMode;
+  storageEndEpoch?: number;
+  relayUrl?: string;
+  aggregatorUrl?: string;
+  feeEstimate?: string;
+  tipConfig?: unknown;
+  warning?: string;
+}
+
 function hydrateProofMetadata(session: AgentSession) {
   const registry = getSuiProofRegistryConfig();
   session.proof.moduleName ??= registry.moduleName;
@@ -85,8 +99,11 @@ function hydrateProofMetadata(session: AgentSession) {
   if (session.proof.proofMode === "local" && !isValidTransactionDigest(session.proof.transactionDigest)) {
     session.proof.network = getNetworkConfig().network;
   }
-  if ((session.proof.status as string) === "onchain_pending") {
-    session.proof.status = "anchored_pending_object";
+  if (
+    (session.proof.status as string) === "onchain_pending" ||
+    (session.proof.status === "anchored_pending_object" && !isValidSuiObjectId(session.proof.suiObjectId))
+  ) {
+    session.proof.status = "prepared";
   }
   if (!isValidSuiObjectId(session.proof.packageId) && registry.configured) {
     session.proof.packageId = registry.packageId;
@@ -108,11 +125,13 @@ function hydrateLocalAdapter(sessions: AgentSession[]) {
 }
 
 async function writeStore(sessions: AgentSession[]) {
-  // Phase 1 deliberately uses a local JSON file. Replace this boundary with a
-  // database in a later persistence phase without changing route consumers.
+  // Local JSON storage is for controlled evaluation only. It is not durable or serverless-safe;
+  // production should replace this boundary with a database or durable KV store.
   await mkdir(path.dirname(STORE_PATH), { recursive: true });
   const payload: SessionStoreFile = { version: 1, sessions };
-  await writeFile(STORE_PATH, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  const tempPath = `${STORE_PATH}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tempPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await rename(tempPath, STORE_PATH);
 }
 
 async function buildStoredSession(
@@ -184,6 +203,21 @@ async function buildStoredSession(
 }
 
 let initializationPromise: Promise<AgentSession[]> | null = null;
+let storeMutationQueue: Promise<void> = Promise.resolve();
+
+async function withStoreMutation<T>(operation: () => Promise<T>) {
+  const previous = storeMutationQueue;
+  let release!: () => void;
+  storeMutationQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+  }
+}
 
 async function initializeStore() {
   const sessions: AgentSession[] = [];
@@ -287,9 +321,11 @@ function normalizeCreateInput(input: CreateAgentSessionRequest): NormalizedSessi
 }
 
 async function persistSession(session: AgentSession) {
-  const sessions = await readStore();
-  await writeStore([session, ...sessions.filter((item) => item.id !== session.id)]);
-  return session;
+  return withStoreMutation(async () => {
+    const sessions = await readStore();
+    await writeStore([session, ...sessions.filter((item) => item.id !== session.id)]);
+    return session;
+  });
 }
 
 export async function createSession(input: CreateAgentSessionRequest) {
@@ -368,44 +404,60 @@ export async function prepareSessionDraft(input: CreateAgentSessionRequest) {
     },
   };
 
+  const persistedDraft = await persistSession(draft);
+
   return {
-    session: draft,
+    session: persistedDraft,
     agentResult: structuredOutput,
-    traceBundle: createTraceBundleFromSession(draft),
+    traceBundle: createTraceBundleFromSession(persistedDraft),
   };
 }
 
-export async function finalizeSessionStorage(
-  id: string,
-  input: {
-    session: AgentSession;
-    storage: StorageReference;
-  },
-) {
-  const session = input.session;
-  if (!session || session.id !== id) {
-    throw new SessionValidationError("Session draft does not match the finalize route.");
+function readStorageString(value: unknown, field: string, required = true) {
+  if (value === undefined || value === null || value === "") {
+    if (required) throw new SessionValidationError(`${field} is required.`);
+    return "";
   }
+  if (typeof value !== "string") {
+    throw new SessionValidationError(`${field} must be a string.`);
+  }
+  const normalized = value.trim();
+  if (!normalized && required) throw new SessionValidationError(`${field} is required.`);
+  if (normalized.length > 512) throw new SessionValidationError(`${field} is too long.`);
+  return normalized;
+}
+
+export async function finalizeSessionStorage(id: string, input: FinalizeStorageInput) {
+  const session = await getSessionById(id);
+  if (!session) return undefined;
   if (!session.ownerAddress || !isValidSuiAddress(session.ownerAddress)) {
     throw new SessionValidationError("A valid session owner wallet is required.");
   }
   if (createTraceHash(session.trace) !== session.trace.traceHash) {
     throw new SessionValidationError("Session trace hash does not match the sealed trace.");
   }
+  if (session.proof.proofMode === "onchain" || isValidTransactionDigest(session.proof.transactionDigest)) {
+    throw new SessionValidationError("Storage cannot be finalized after proof anchoring has started.");
+  }
+  if (session.storage.storageProvider !== "walrus_sdk_relay") {
+    throw new SessionValidationError("Session is not awaiting Walrus SDK Relay finalization.");
+  }
+  if (!["prepared", "pending", "queued"].includes(session.storage.storageStatus)) {
+    throw new SessionValidationError("Session is not in a finalizable storage state.");
+  }
 
-  const storage = input.storage;
-  if (storage.storageProvider !== "walrus_sdk_relay") {
-    throw new SessionValidationError("storageProvider must be walrus_sdk_relay.");
+  const uploadJobId = readStorageString(input.uploadJobId, "uploadJobId");
+  const blobId = readStorageString(input.blobId, "blobId");
+  const blobObjectId = readStorageString(input.blobObjectId || input.objectId, "blobObjectId", false);
+  if (input.storageEpochs !== undefined && input.storageEpochs !== session.storageEpochs) {
+    throw new SessionValidationError("storageEpochs must match the prepared session.");
   }
-  if (storage.uploadAdapter !== "walrus_mainnet_upload_relay") {
-    throw new SessionValidationError("uploadAdapter must be walrus_mainnet_upload_relay.");
-  }
-  if (!storage.blobId) {
-    throw new SessionValidationError("Walrus blob ID is required.");
+  if (input.storageMode !== undefined && input.storageMode !== session.storageMode) {
+    throw new SessionValidationError("storageMode must match the prepared session.");
   }
 
   const adapter = getStorageAdapter("walrus_sdk_relay");
-  const storageVerification = await adapter.verifyStoredTrace(storage.blobId, session.trace.traceHash);
+  const storageVerification = await adapter.verifyStoredTrace(blobId, session.trace.traceHash);
   if (!storageVerification.checked) {
     throw new SessionValidationError(storageVerification.error ?? "Walrus Mainnet blob could not be read from the aggregator.");
   }
@@ -415,11 +467,24 @@ export async function finalizeSessionStorage(
 
   const checkedAt = new Date().toISOString();
   const finalizedStorage: StorageReference = {
-    ...storage,
-    directReadUrl: storage.directReadUrl || `/api/storage/read/${storage.blobId}`,
+    ...session.storage,
+    uploadJobId,
+    blobId,
+    blobObjectId,
+    directReadUrl: `/api/storage/read/${blobId}`,
     hashMatched: true,
     storageStatus: "stored",
     storageNetwork: "walrus-mainnet",
+    storageEpochs: session.storageEpochs,
+    storageEndEpoch: input.storageEndEpoch,
+    relayUrl: readStorageString(input.relayUrl, "relayUrl", false) || session.storage.relayUrl,
+    aggregatorUrl: readStorageString(input.aggregatorUrl, "aggregatorUrl", false) || session.storage.aggregatorUrl,
+    feeEstimate: readStorageString(input.feeEstimate, "feeEstimate", false) || session.storage.feeEstimate,
+    tipConfig: input.tipConfig ?? session.storage.tipConfig,
+    warning:
+      typeof input.warning === "string"
+        ? input.warning.replace(/\s+/g, " ").trim().slice(0, 500)
+        : session.storage.warning,
     checkedAt: storageVerification.checkedAt,
     updatedAt: checkedAt,
   };
@@ -476,6 +541,56 @@ export async function listSessions() {
 export async function getSessionById(id: string) {
   const sessions = await readStore();
   return sessions.find((session) => session.id === id);
+}
+
+function shortReference(value: string | null | undefined, head = 12, tail = 8) {
+  if (!value) return "";
+  if (value.length <= head + tail + 3) return value;
+  return `${value.slice(0, head)}...${value.slice(-tail)}`;
+}
+
+export function redactSessionSummary(session: AgentSession) {
+  return {
+    id: session.id,
+    title: session.title,
+    agentMode: session.agentMode,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    status: session.status,
+    owner: shortReference(session.ownerAddress, 10, 6),
+    fileCount: session.inputFiles.length,
+    hashes: {
+      inputHash: shortReference(session.trace.inputHash),
+      resultHash: shortReference(session.trace.resultHash),
+      traceHash: shortReference(session.trace.traceHash),
+    },
+    storage: {
+      provider: session.storage.storageProvider,
+      status: session.storage.storageStatus,
+      network: session.storage.storageNetwork,
+      blobId: shortReference(session.storage.blobId),
+      hashMatched: session.storage.hashMatched,
+    },
+    proof: {
+      status: session.proof.status,
+      network: session.proof.network,
+      transactionDigest: shortReference(session.proof.transactionDigest),
+      suiObjectId: shortReference(session.proof.suiObjectId),
+    },
+    verification: {
+      walrusBlobAvailable: session.verification.walrusBlobAvailable,
+      directWalrusReadPassed: session.verification.directWalrusReadPassed,
+      suiProofFound: session.verification.suiProofFound,
+      tatumRpcPassed: session.verification.tatumRpcPassed,
+      hashMatched: session.verification.hashMatched,
+      checkedAt: session.verification.checkedAt,
+    },
+  };
+}
+
+export async function listSessionSummaries() {
+  const sessions = await listSessions();
+  return sessions.map(redactSessionSummary);
 }
 
 export async function anchorSessionProof(id: string, input: ProofAnchorInput) {
@@ -543,13 +658,34 @@ export async function anchorSessionProof(id: string, input: ProofAnchorInput) {
   }
 
   const checkedAt = new Date().toISOString();
-  const tatumConfig = getTatumSuiRpcConfig();
+  const candidateProof = {
+    ...session.proof,
+    suiObjectId: normalizedProofObjectId ?? session.proof.suiObjectId,
+    transactionDigest,
+    owner: normalizedOwner,
+    network,
+    packageId: normalizedPackageId,
+    moduleName: registry.moduleName,
+    createFunction: registry.createFunction,
+    eventType: registry.eventType,
+    proofMode: "onchain" as const,
+  };
+  const tatumRpc = await verifyProofMetadata(candidateProof, {
+    sessionId: session.id,
+    owner: normalizedOwner,
+    traceHash: session.trace.traceHash,
+    resultHash: session.trace.resultHash,
+    inputHash: session.trace.inputHash,
+    blobId: session.storage.blobId,
+    storageNetwork: session.storage.storageNetwork ?? session.proof.storageNetwork ?? "walrus-mainnet",
+  });
+  const proofVerified = tatumRpc.status === "passed";
   const anchoredSession: AgentSession = {
     ...session,
     updatedAt: checkedAt,
     proof: {
-      ...session.proof,
-      suiObjectId: normalizedProofObjectId ?? "proof-object-pending",
+      ...candidateProof,
+      suiObjectId: normalizedProofObjectId ?? session.proof.suiObjectId,
       transactionDigest,
       owner: normalizedOwner,
       network,
@@ -558,21 +694,10 @@ export async function anchorSessionProof(id: string, input: ProofAnchorInput) {
       createFunction: registry.createFunction,
       eventType: registry.eventType,
       proofMode: "onchain",
-      status: normalizedProofObjectId ? "anchored" : "anchored_pending_object",
-      anchoredAt: checkedAt,
+      status: proofVerified ? "verified" : "prepared",
+      ...(proofVerified ? { anchoredAt: checkedAt } : {}),
     },
-    tatumRpc: {
-      status: tatumConfig.configured ? "pending" : "not_configured",
-      configured: tatumConfig.configured,
-      onchain: true,
-      checkedAt,
-      objectFound: null,
-      transactionFound: null,
-      eventFound: null,
-      message: normalizedProofObjectId
-        ? "Proof anchor recorded. Run verification to confirm the Sui object through Tatum RPC."
-        : "Proof-anchor transaction recorded. The wallet result did not include the created proof object ID.",
-    },
+    tatumRpc,
   };
 
   return persistSession(anchoredSession);
@@ -631,9 +756,8 @@ export async function verifySession(id: string): Promise<LocalVerificationReport
       status:
         tatumRpc.status === "passed"
           ? "verified"
-          : isValidTransactionDigest(session.proof.transactionDigest) &&
-              !isValidSuiObjectId(session.proof.suiObjectId)
-            ? "anchored_pending_object"
+          : session.proof.status === "anchored_pending_object"
+            ? "prepared"
             : session.proof.status,
     },
     storage: { ...session.storage, hashMatched },

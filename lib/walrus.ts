@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createTraceHash } from "@/lib/hash";
+import { fetchWithTimeout, readResponseTextWithLimit } from "@/lib/http/safe-request";
 import type { TraceBundle } from "@/lib/storage-adapters/types";
 import { serializeTraceBundle } from "@/lib/trace-bundle";
 import type { StorageMode, WalrusReadStatus } from "@/types/blackbox";
@@ -106,7 +107,7 @@ export async function readWalrusBlob(blobId: string) {
   }
 
   try {
-    const response = await fetch(readUrl, { cache: "no-store" });
+    const response = await fetchWithTimeout(readUrl, { cache: "no-store" }, 10_000);
     if (!response.ok) {
       return {
         blobId,
@@ -123,7 +124,7 @@ export async function readWalrusBlob(blobId: string) {
     }
 
     const contentType = response.headers.get("content-type") ?? "";
-    const text = await response.text();
+    const text = await readResponseTextWithLimit(response, 2 * 1024 * 1024);
     try {
       const payload = JSON.parse(text) as TraceBundle;
       if (!payload?.trace) throw new Error("traceBundle.trace is missing.");

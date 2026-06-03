@@ -12,7 +12,11 @@ interface ReadinessPayload {
     agentRuntimeKeyPresent: boolean;
     tatumKeyPresent: boolean;
     tatumRpcConfigured: boolean;
+    tatumRpcStatus: string;
+    tatumRpcHost: string;
+    tatumRpcNetwork: string;
     tatumRpcReachable: boolean;
+    tatumRpcCheckedAt: string;
     tatumRpcMessage: string;
     tatumMcpStatus: "disabled" | "configured" | "missing_api_key" | "package_unavailable" | "runtime_unavailable";
     tatumMcpMessage: string;
@@ -56,7 +60,7 @@ function formatTatumMcpStatus(data: ReadinessPayload["data"]) {
 }
 
 function shouldRenderReadinessBadge(value: string) {
-  return /^(yes|no|ready|failed|pending|checking\.\.\.|configured|not configured|reachable|unavailable|available|not required|matched|mismatch|missing api key|package unavailable|runtime unavailable|disabled|walrus verified|sui anchored|sample trace|prepared)$/i.test(value);
+  return /^(yes|no|ready|failed|pending|checking\.\.\.|configured|not configured|reachable|unavailable|available|not required|matched|mismatch|missing api key|package unavailable|runtime unavailable|disabled|walrus verified|sui anchored|local trace|prepared)$/i.test(value);
 }
 
 export function ReadinessPanel() {
@@ -85,8 +89,11 @@ export function ReadinessPanel() {
   const rows = data
     ? [
         { label: "Agent Runtime key present", value: yesNo(data.agentRuntimeKeyPresent) },
-        { label: "Tatum key present", value: yesNo(data.tatumKeyPresent), protocol: "tatum" as Protocol },
-        { label: "Tatum RPC reachable", value: yesNo(data.tatumRpcReachable), protocol: "tatum" as Protocol },
+        { label: "Tatum Sui RPC status", value: data.tatumRpcStatus, protocol: "tatum" as Protocol },
+        { label: "Tatum Sui RPC network", value: data.tatumRpcNetwork, protocol: "tatum" as Protocol },
+        { label: "Tatum Sui RPC host", value: data.tatumRpcHost, protocol: "tatum" as Protocol },
+        { label: "Tatum Sui RPC API key", value: yesNo(data.tatumKeyPresent), protocol: "tatum" as Protocol },
+        { label: "Tatum Sui RPC last check", value: data.tatumRpcCheckedAt, protocol: "tatum" as Protocol },
         { label: "Tatum MCP Tools", value: formatTatumMcpStatus(data), protocol: "tatum" as Protocol },
         { label: "Tatum MCP API key present", value: yesNo(data.tatumMcpApiKeyPresent), protocol: "tatum" as Protocol },
         { label: "Walrus Upload Relay", value: formatWalrusRelayStatus(data), protocol: "walrus" as Protocol },
@@ -99,7 +106,7 @@ export function ReadinessPanel() {
         { label: "Last Walrus blob/hash status", value: data.lastWalrusBlobHashStatus, protocol: "walrus" as Protocol },
       ]
     : [
-        { label: "Tatum RPC reachable", value: error ? "Unavailable" : "Checking...", protocol: "tatum" as Protocol },
+        { label: "Tatum Sui RPC status", value: error ? "Unavailable" : "Checking...", protocol: "tatum" as Protocol },
         { label: "Tatum MCP Tools", value: error ? "Unavailable" : "Checking...", protocol: "tatum" as Protocol },
         { label: "Walrus Upload Relay", value: error ? "Unavailable" : "Checking...", protocol: "walrus" as Protocol },
         { label: "Walrus relay tip", value: error ? "Unavailable" : "Checking...", protocol: "walrus" as Protocol },

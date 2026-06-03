@@ -5,7 +5,9 @@ import {
   recheckSession,
   SessionValidationError,
 } from "@/lib/session-service";
-import type { PlaceholderApiResponse } from "@/types/blackbox";
+import { apiErrorPayload, BODY_SIZE_LIMITS, readJsonRequest, SafeRequestError, safeRequestErrorPayload } from "@/lib/http/safe-request";
+import { guardApiRequest } from "@/lib/security/api-guard";
+import type { ApiSuccessResponse } from "@/types/blackbox";
 
 interface ProofAnchorRequest {
   transactionDigest?: unknown;
@@ -38,15 +40,28 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const guard = await guardApiRequest(request, { profile: "strict" });
+  if (guard) return guard;
+
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (contentLength > MAX_REQUEST_BYTES) {
-    return NextResponse.json({ ok: false, message: "Request body is too large." }, { status: 413 });
+    return NextResponse.json(apiErrorPayload("REQUEST_TOO_LARGE", "Request body is too large."), { status: 413 });
   }
 
-  const body = (await request.json().catch(() => null)) as ProofAnchorRequest | null;
+  let body: ProofAnchorRequest | null = null;
+  try {
+    body = await readJsonRequest<ProofAnchorRequest>(request, {
+      maxBytes: Math.min(MAX_REQUEST_BYTES, BODY_SIZE_LIMITS.normalJson),
+    });
+  } catch (error) {
+    if (error instanceof SafeRequestError) {
+      return NextResponse.json(safeRequestErrorPayload(error), { status: error.statusCode });
+    }
+    throw error;
+  }
   if (!body) {
     return NextResponse.json(
-      { ok: false, message: "A JSON proof-anchor body is required." },
+      apiErrorPayload("INVALID_JSON", "A JSON proof-anchor body is required."),
       { status: 400 },
     );
   }
@@ -61,20 +76,21 @@ export async function POST(
       owner: readRequiredString(body.owner, "owner"),
     });
     if (!session) {
-      return NextResponse.json({ ok: false, message: "Session not found." }, { status: 404 });
+      return NextResponse.json(apiErrorPayload("SESSION_NOT_FOUND", "Session not found."), { status: 404 });
     }
 
     const verification = await recheckSession(session.id);
     const persistedSession = verification?.session ?? session;
-    const response: PlaceholderApiResponse<{
+    const response: ApiSuccessResponse<{
       session: typeof persistedSession;
       verification: typeof verification | null;
     }> = {
       ok: true,
-      phase: "phase-2d",
       message:
-        persistedSession.proof.status === "anchored_pending_object"
-          ? "Transaction anchored. Proof object extraction pending."
+        persistedSession.tatumRpc.status === "transaction_found"
+          ? "Transaction found, but proof object/event verification is incomplete."
+          : persistedSession.tatumRpc.status === "passed"
+            ? "Wallet-signed Sui proof anchor verified through Tatum RPC."
           : "Wallet-signed Sui proof anchor recorded and read-only verification rerun completed.",
       data: {
         session: persistedSession,
@@ -84,7 +100,7 @@ export async function POST(
     return NextResponse.json(response);
   } catch (error) {
     if (error instanceof SessionValidationError) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
+      return NextResponse.json(apiErrorPayload("SESSION_VALIDATION_FAILED", error.message), { status: 400 });
     }
     throw error;
   }

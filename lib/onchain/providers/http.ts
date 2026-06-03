@@ -1,5 +1,7 @@
 import "server-only";
 
+import { fetchWithTimeout, readResponseTextWithLimit } from "@/lib/http/safe-request";
+
 export interface SafeProviderJson<T = unknown> {
   ok: boolean;
   status: number;
@@ -12,15 +14,15 @@ export async function fetchProviderJson<T = unknown>(
   init?: RequestInit,
 ): Promise<SafeProviderJson<T>> {
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       ...init,
       headers: {
         Accept: "application/json",
         ...(init?.headers ?? {}),
       },
       cache: "no-store",
-    });
-    const text = await response.text();
+    }, 10_000);
+    const text = await readResponseTextWithLimit(response, 512 * 1024);
     const contentType = response.headers.get("content-type") ?? "";
     if (!contentType.includes("application/json")) {
       return {

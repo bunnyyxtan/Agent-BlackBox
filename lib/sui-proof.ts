@@ -124,10 +124,13 @@ export function extractProofObjectIdFromTransactionResult(result: unknown) {
 }
 
 export function isAnchoredProof(proof: ProofMetadata) {
-  return isValidTransactionDigest(proof.transactionDigest);
+  return (
+    isValidTransactionDigest(proof.transactionDigest) &&
+    (proof.status === "anchored" || proof.status === "verified")
+  );
 }
 
 export function getProofExplorerUrl(proof: ProofMetadata) {
-  if (!isAnchoredProof(proof)) return undefined;
+  if (!isValidTransactionDigest(proof.transactionDigest)) return undefined;
   return buildSuiExplorerUrl("transaction", proof.transactionDigest, proof.network);
 }

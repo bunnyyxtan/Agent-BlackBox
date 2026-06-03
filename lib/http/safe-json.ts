@@ -41,9 +41,44 @@ function firstSnippet(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
+async function readResponseTextWithLimit(response: Response, endpoint: string, maxBytes = 512 * 1024) {
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new SafeJsonResponseError({
+        endpoint,
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get("content-type") ?? "",
+        snippet: "",
+        reason: "invalid_json",
+      });
+    }
+    chunks.push(value);
+  }
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(merged);
+}
+
 export async function readJsonResponse<T>(response: Response, endpoint: string): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";
-  const text = await response.text();
+  const text = await readResponseTextWithLimit(response, endpoint);
   const snippet = firstSnippet(text);
 
   if (!isJsonContentType(contentType)) {

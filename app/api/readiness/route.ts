@@ -3,16 +3,30 @@ import { NextResponse } from "next/server";
 import { getSessionEvidenceStatus } from "@/lib/constants";
 import { getTatumMcpStatus } from "@/lib/mcp/tatum-mcp";
 import { getNetworkConfig } from "@/lib/network-config";
+import { guardApiRequest } from "@/lib/security/api-guard";
 import { listSessions } from "@/lib/session-service";
 import { getUploadRelayTipConfig } from "@/lib/storage-adapters/walrus-sdk-relay";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
 import { checkTatumSuiRpcReachability, getTatumSuiRpcConfig } from "@/lib/tatum-rpc";
 import { getWalrusConfiguration, getWalrusNetworkLabel } from "@/lib/walrus";
-import type { PlaceholderApiResponse } from "@/types/blackbox";
+import type { ApiSuccessResponse } from "@/types/blackbox";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+function formatTatumRpcStatus(
+  tatum: ReturnType<typeof getTatumSuiRpcConfig>,
+  reachability: Awaited<ReturnType<typeof checkTatumSuiRpcReachability>>,
+) {
+  if (!tatum.apiKeyConfigured) return "Missing API Key";
+  if (tatum.rpcNetworkMismatch) return "Mismatch";
+  if (!tatum.rpcUrlConfigured) return "Not Configured";
+  return reachability.reachable ? "Ready" : "Unavailable";
+}
+
+export async function GET(request: Request) {
+  const guard = await guardApiRequest(request, { profile: "read" });
+  if (guard) return guard;
+
   const [sessions, tatumReachability, relayStatus, tatumMcp] = await Promise.all([
     listSessions(),
     checkTatumSuiRpcReachability(),
@@ -28,7 +42,11 @@ export async function GET() {
     agentRuntimeKeyPresent: Boolean(process.env.OPENAI_API_KEY?.trim()),
     tatumKeyPresent: tatum.apiKeyConfigured,
     tatumRpcConfigured: tatum.configured,
+    tatumRpcStatus: formatTatumRpcStatus(tatum, tatumReachability),
+    tatumRpcHost: tatum.rpcHost,
+    tatumRpcNetwork: network.displayNetwork,
     tatumRpcReachable: tatumReachability.reachable,
+    tatumRpcCheckedAt: tatumReachability.checkedAt,
     tatumRpcMessage: tatumReachability.message,
     tatumMcpStatus: tatumMcp.status,
     tatumMcpMessage: tatumMcp.message,
@@ -45,13 +63,12 @@ export async function GET() {
       ? latest.verification.directWalrusReadPassed && latest.storage.hashMatched
         ? "Walrus Verified"
         : latest.storage.storageProvider === "local"
-          ? "Sample Trace"
+          ? "Local Trace"
           : "Prepared"
       : "No sessions yet",
   };
-  const response: PlaceholderApiResponse<typeof result> = {
+  const response: ApiSuccessResponse<typeof result> = {
     ok: true,
-    phase: "phase-2e",
     message: "Readiness status loaded without exposing secrets.",
     data: result,
   };

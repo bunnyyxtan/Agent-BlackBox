@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHashFromString, createTraceHash } from "@/lib/hash";
+import { fetchWithTimeout, readResponseTextWithLimit } from "@/lib/http/safe-request";
 import type {
   StorageAdapter,
   StorageStatusResult,
@@ -83,12 +84,12 @@ export const walrusDirectStorageAdapter: StorageAdapter = {
     }
     let response: Response;
     try {
-      response = await fetch(getWalrusStoreUrl(options.storageEpochs, options.storageMode), {
+      response = await fetchWithTimeout(getWalrusStoreUrl(options.storageEpochs, options.storageMode), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: serializeTraceBundle(traceBundle),
         cache: "no-store",
-      });
+      }, 10_000);
     } catch (error) {
       throw new WalrusHttpError(
         `Walrus upload failed: ${error instanceof Error ? error.message : "unknown error"}`,
@@ -97,7 +98,7 @@ export const walrusDirectStorageAdapter: StorageAdapter = {
       );
     }
     const contentType = response.headers.get("content-type") ?? "";
-    const text = await response.text();
+    const text = await readResponseTextWithLimit(response, 512 * 1024);
     if (!response.ok) {
       throw new WalrusHttpError(`Walrus upload failed with status ${response.status}.`, 502, "upload_failed");
     }

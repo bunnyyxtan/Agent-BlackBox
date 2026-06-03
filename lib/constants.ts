@@ -122,6 +122,6 @@ export function getSessionEvidenceStatus(session: AgentSession) {
   ) {
     return "Walrus Verified";
   }
-  if (session.storage.storageProvider === "local") return "Sample Trace";
+  if (session.storage.storageProvider === "local") return "Local Trace";
   return "Prepared";
 }

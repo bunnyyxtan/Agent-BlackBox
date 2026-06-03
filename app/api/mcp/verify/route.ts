@@ -1,24 +1,37 @@
 import { NextResponse } from "next/server";
 
-import { verifyWithMcpPlaceholder } from "@/lib/mcp-verifier";
+import { apiErrorPayload, BODY_SIZE_LIMITS, readJsonRequest, SafeRequestError, safeRequestErrorPayload } from "@/lib/http/safe-request";
+import { reviewProofBundleForMcp } from "@/lib/mcp-verifier";
+import { guardApiRequest } from "@/lib/security/api-guard";
 import { getSessionById } from "@/lib/session-service";
-import type { PlaceholderApiResponse } from "@/types/blackbox";
+import type { ApiSuccessResponse } from "@/types/blackbox";
+
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { sessionId: string };
+  const guard = await guardApiRequest(request, { profile: "strict" });
+  if (guard) return guard;
+
+  let body: { sessionId: string };
+  try {
+    body = await readJsonRequest<{ sessionId: string }>(request, { maxBytes: BODY_SIZE_LIMITS.normalJson });
+  } catch (error) {
+    if (error instanceof SafeRequestError) {
+      return NextResponse.json(safeRequestErrorPayload(error), { status: error.statusCode });
+    }
+    throw error;
+  }
   if (!body.sessionId) {
-    return NextResponse.json({ ok: false, message: "sessionId is required." }, { status: 400 });
+    return NextResponse.json(apiErrorPayload("SESSION_ID_REQUIRED", "sessionId is required."), { status: 400 });
   }
   const session = await getSessionById(body.sessionId);
   if (!session) {
-    return NextResponse.json({ ok: false, message: "Session not found." }, { status: 404 });
+    return NextResponse.json(apiErrorPayload("SESSION_NOT_FOUND", "Session not found."), { status: 404 });
   }
-  // TODO(phase-2): connect the optional Tatum MCP verifier for AI-assisted evidence inspection.
-  const result = await verifyWithMcpPlaceholder(session);
-  const response: PlaceholderApiResponse<typeof result> = {
+  const result = await reviewProofBundleForMcp(session);
+  const response: ApiSuccessResponse<typeof result> = {
     ok: true,
-    phase: "phase-1",
-    message: "Tatum MCP verification boundary prepared.",
+    message: "Proof bundle review completed.",
     data: result,
   };
   return NextResponse.json(response);

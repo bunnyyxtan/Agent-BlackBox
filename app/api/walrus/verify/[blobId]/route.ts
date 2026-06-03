@@ -1,25 +1,39 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorPayload, BODY_SIZE_LIMITS, readJsonRequest, SafeRequestError, safeRequestErrorPayload } from "@/lib/http/safe-request";
+import { guardApiRequest } from "@/lib/security/api-guard";
 import { walrusSdkRelayStorageAdapter } from "@/lib/storage-adapters/walrus-sdk-relay";
-import type { PlaceholderApiResponse } from "@/types/blackbox";
+import type { ApiSuccessResponse } from "@/types/blackbox";
 
 export async function POST(request: Request, { params }: { params: Promise<{ blobId: string }> }) {
+  const guard = await guardApiRequest(request, { profile: "standard" });
+  if (guard) return guard;
+
   const { blobId } = await params;
-  const body = (await request.json()) as { expectedHash?: string; expectedTraceHash?: string };
+  let body: { expectedHash?: string; expectedTraceHash?: string };
+  try {
+    body = await readJsonRequest<{ expectedHash?: string; expectedTraceHash?: string }>(request, {
+      maxBytes: BODY_SIZE_LIMITS.normalJson,
+    });
+  } catch (error) {
+    if (error instanceof SafeRequestError) {
+      return NextResponse.json(safeRequestErrorPayload(error), { status: error.statusCode });
+    }
+    throw error;
+  }
   const expectedHash = body.expectedTraceHash ?? body.expectedHash;
   if (!expectedHash) {
-    return NextResponse.json({ ok: false, message: "expectedTraceHash is required." }, { status: 400 });
+    return NextResponse.json(apiErrorPayload("EXPECTED_TRACE_HASH_REQUIRED", "expectedTraceHash is required."), { status: 400 });
   }
   const result = await walrusSdkRelayStorageAdapter.verifyStoredTrace(blobId, expectedHash);
   if (!result.checked) {
     return NextResponse.json(
-      { ok: false, message: result.error ?? "Walrus blob could not be verified.", data: result },
+      apiErrorPayload("WALRUS_VERIFY_FAILED", result.error ?? "Walrus blob could not be verified."),
       { status: result.readStatus === "not_configured" ? 503 : result.readStatus === "invalid_json" ? 422 : 404 },
     );
   }
-  const response: PlaceholderApiResponse<typeof result> = {
+  const response: ApiSuccessResponse<typeof result> = {
     ok: true,
-    phase: "phase-2e",
     message: "Direct Walrus Mainnet hash verification completed from aggregator content.",
     data: result,
   };

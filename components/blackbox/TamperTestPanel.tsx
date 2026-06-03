@@ -49,7 +49,7 @@ export function TamperTestPanel({
             Tamper Resistance Test
           </h3>
           <p className="mt-1 text-xs font-light leading-relaxed text-zinc-400 [overflow-wrap:anywhere]">
-            Run a local demo mutation without changing the sealed session or real proof status.
+            Run a local trace mutation without changing the sealed session or real proof status.
           </p>
           {tampered && (
             <>

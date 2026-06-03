@@ -5,7 +5,8 @@ import {
   discoverTatumMcpTools,
   getTatumMcpStatus,
   resolveTatumMcpToolName,
-  runTatumMcpToolCall,
+  runTatumMcpToolCalls,
+  type RunMcpToolCallParams,
   type TatumMcpToolName,
 } from "@/lib/mcp/tatum-mcp";
 import { EVM_CHAIN_REGISTRY } from "@/lib/onchain/chain-registry";
@@ -212,8 +213,8 @@ async function collectTatumMcpEvidence(
         }),
       ];
     }
-    return [
-      await runTatumMcpToolCall({
+    return runTatumMcpToolCalls([
+      {
         toolName,
         network: tatumNetwork,
         target: detected.target,
@@ -222,8 +223,8 @@ async function collectTatumMcpEvidence(
           method: "eth_getTransactionByHash",
           params: [detected.target],
         },
-      }),
-    ];
+      },
+    ]);
   }
 
   const baseArgs = {
@@ -232,9 +233,9 @@ async function collectTatumMcpEvidence(
   };
   const calls: OnchainMcpToolEvidence[] = [];
   const portfolioTool = resolveTatumMcpToolName("get_wallet_portfolio", availableTools);
-  calls.push(
-    portfolioTool
-      ? await runTatumMcpToolCall({
+  const toolCallRequests: RunMcpToolCallParams[] = [];
+  if (portfolioTool) {
+    toolCallRequests.push({
           toolName: portfolioTool,
           ...baseArgs,
           args: {
@@ -243,19 +244,19 @@ async function collectTatumMcpEvidence(
             tokenTypes: "native",
             pageSize: "10",
           },
-        })
-      : buildToolUnavailableMcpCall({
+        });
+  } else {
+    calls.push(buildToolUnavailableMcpCall({
           availableTools,
           detected,
           tatumNetwork,
           toolName: "get_wallet_portfolio",
-        }),
-  );
+        }));
+  }
 
   const historyTool = resolveTatumMcpToolName("get_transaction_history", availableTools);
-  calls.push(
-    historyTool
-      ? await runTatumMcpToolCall({
+  if (historyTool) {
+    toolCallRequests.push({
           toolName: historyTool,
           ...baseArgs,
           args: {
@@ -264,34 +265,38 @@ async function collectTatumMcpEvidence(
             pageSize: "10",
             sort: "DESC",
           },
-        })
-      : buildToolUnavailableMcpCall({
+        });
+  } else {
+    calls.push(buildToolUnavailableMcpCall({
           availableTools,
           detected,
           tatumNetwork,
           toolName: "get_transaction_history",
-        }),
-  );
+        }));
+  }
 
   const maliciousTool = resolveTatumMcpToolName("check_malicous_address", availableTools);
-  calls.push(
-    maliciousTool
-      ? await runTatumMcpToolCall({
+  if (maliciousTool) {
+    toolCallRequests.push({
           toolName: maliciousTool,
           ...baseArgs,
           args: {
             address: detected.target,
           },
-        })
-      : buildToolUnavailableMcpCall({
+        });
+  } else {
+    calls.push(buildToolUnavailableMcpCall({
           availableTools,
           detected,
           optional: true,
           summary: "Optional Tatum MCP malicious-address tool not available.",
           tatumNetwork,
           toolName: "check_malicous_address",
-        }),
-  );
+        }));
+  }
+  if (toolCallRequests.length > 0) {
+    calls.push(...await runTatumMcpToolCalls(toolCallRequests));
+  }
   return calls;
 }
 

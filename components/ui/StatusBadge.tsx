@@ -26,7 +26,6 @@ const LABEL_OVERRIDES: Record<string, string> = {
   live: "Live",
   local: "Local",
   local_only: "Local Only",
-  "local demo": "Local Check",
   "local fallback": "Local Check",
   "local phase": "Local Check",
   "local phase 1": "Local Check",
@@ -171,7 +170,6 @@ const NEUTRAL_STATES = new Set([
   "disabled",
   "local",
   "local_only",
-  "local demo",
   "local fallback",
   "local phase",
   "local phase 1",
@@ -182,7 +180,6 @@ const NEUTRAL_STATES = new Set([
   "not required",
   "no_tip",
   "optional",
-  "sample trace",
   "skipped",
   "unknown",
 ]);

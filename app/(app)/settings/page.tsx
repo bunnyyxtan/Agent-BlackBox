@@ -61,10 +61,6 @@ export default async function SettingsPage() {
     { label: "Tatum Sui RPC network match", value: tatumRpc.rpcNetworkMismatch ? "Mismatch" : "Matched", protocol: "tatum" as Protocol },
     { label: "Tatum API key present", value: tatumRpc.apiKeyConfigured ? "Yes" : "No", protocol: "tatum" as Protocol },
     { label: "Tatum MCP Tools", value: formatTatumMcpStatus(tatumMcp.status), protocol: "tatum" as Protocol },
-    { label: "Tatum MCP provider", value: tatumMcp.provider, protocol: "tatum" as Protocol },
-    { label: "Tatum MCP package", value: tatumMcp.packageName, protocol: "tatum" as Protocol },
-    { label: "Tatum MCP mode", value: "EVM/multichain analysis", protocol: "tatum" as Protocol },
-    { label: "Tatum MCP runtime check", value: "Runtime will be checked during first EVM analysis", protocol: "tatum" as Protocol },
     { label: "Storage Method", value: formatStorageMethod(walrus.provider), protocol: "walrus" as Protocol },
     { label: "Sui network", value: network.displayNetwork, protocol: "sui" as Protocol },
     { label: "Sui Proof Contract", value: proofRegistry.configured ? "Configured" : "Not Configured", protocol: "sui" as Protocol },
@@ -122,10 +118,17 @@ export default async function SettingsPage() {
         <div className="flex items-start gap-2">
           <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-amber-100" />
           <p className="text-xs leading-5 text-slate-400">
-            Tatum API keys and RPC credentials remain server-side. Phase 2D keeps proof signing in the
+            Tatum API keys and RPC credentials remain server-side. Proof signing stays in the
             connected browser wallet and does not use private-key environment variables.
           </p>
         </div>
+      </GlassCard>
+
+      <GlassCard className="mt-5 border-amber-200/15 bg-amber-200/[0.035] p-4">
+        <p className="text-xs leading-5 text-slate-400">
+          Local session storage is for controlled evaluation only and is not serverless-safe. Production deployments
+          should use durable authenticated storage plus encrypted trace handling.
+        </p>
       </GlassCard>
     </>
   );

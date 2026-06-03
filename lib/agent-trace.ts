@@ -25,7 +25,7 @@ function offsetTimestamp(createdAt: string, seconds: number) {
   return new Date(new Date(createdAt).getTime() + seconds * 1000).toISOString();
 }
 
-function placeholderId(prefix: string, seed: string, length = 36) {
+function deterministicLocalId(prefix: string, seed: string, length = 36) {
   return `${prefix}${createHashFromString(seed).slice(0, length)}`;
 }
 
@@ -505,9 +505,9 @@ export function createLocalAgentSession(input: CreateSessionInput, structuredOut
     ? generateAgentTraceFromRuntime(normalizedInput, structuredOutput)
     : generateAgentTrace(normalizedInput);
   const inputFiles = buildInputFiles(normalizedInput);
-  const uploadJobId = placeholderId("local-upload-", `${id}:job`, 18);
-  const blobId = placeholderId("local-blob-", `${id}:blob`, 30);
-  const blobObjectId = placeholderId("local-object-", `${id}:walrus-object`, 30);
+  const uploadJobId = deterministicLocalId("local-upload-", `${id}:job`, 18);
+  const blobId = deterministicLocalId("local-blob-", `${id}:blob`, 30);
+  const blobObjectId = deterministicLocalId("local-object-", `${id}:walrus-object`, 30);
   const ownerAddress = input.ownerAddress ?? null;
   const expiryDate = new Date(
     new Date(createdAt).getTime() + (input.storageEpochs ?? 5) * 24 * 60 * 60 * 1000,
@@ -584,7 +584,7 @@ export function createLocalAgentSession(input: CreateSessionInput, structuredOut
       transactionFound: null,
       eventFound: null,
       message:
-        "This session has local Phase 1 proof metadata. On-chain proof registry is not deployed yet.",
+        "This session has local proof metadata. Anchor on Sui Mainnet for independent proof verification.",
     },
     verification: {
       storagePrepared: true,

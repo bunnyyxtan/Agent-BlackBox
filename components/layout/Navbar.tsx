@@ -25,7 +25,7 @@ export function Navbar() {
 
           {/* Desktop Only Context */}
           <span className="hidden lg:inline-flex items-center text-xs text-zinc-500 font-mono tracking-wider uppercase">
-            <span className="font-medium text-zinc-300 mr-2">{APP_NAME}</span> / <span className="ml-2 text-indigo-300">Phase 1</span>
+            <span className="font-medium text-zinc-300 mr-2">{APP_NAME}</span> / <span className="ml-2 text-indigo-300">Mainnet Proof Console</span>
           </span>
         </div>
         <div className="flex items-center gap-2">

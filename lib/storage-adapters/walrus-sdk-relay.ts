@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHashFromString, createTraceHash } from "@/lib/hash";
+import { fetchWithTimeout, readResponseTextWithLimit } from "@/lib/http/safe-request";
 import type {
   StorageAdapter,
   StorageLookup,
@@ -79,9 +80,9 @@ export async function getUploadRelayTipConfig() {
   }
 
   try {
-    const response = await fetch(`${relayUrl}/v1/tip-config`, { cache: "no-store" });
+    const response = await fetchWithTimeout(`${relayUrl}/v1/tip-config`, { cache: "no-store" }, 8_000);
     const contentType = response.headers.get("content-type") ?? "";
-    const text = await response.text();
+    const text = await readResponseTextWithLimit(response, 64 * 1024);
     let tipConfig: unknown = null;
     if (isJsonContentType(contentType) && text.trim()) {
       try {

@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorPayload } from "@/lib/http/safe-request";
+import { guardApiRequest } from "@/lib/security/api-guard";
 import { getStorageAdapter } from "@/lib/storage-adapters";
 import { getStorageReferenceByBlobId, hydrateSessionStore } from "@/lib/session-service";
-import type { PlaceholderApiResponse } from "@/types/blackbox";
+import type { ApiSuccessResponse } from "@/types/blackbox";
 
 export async function GET(request: Request, { params }: { params: Promise<{ blobId: string }> }) {
+  const guard = await guardApiRequest(request, { profile: "read" });
+  if (guard) return guard;
+
   const { blobId } = await params;
   await hydrateSessionStore();
   const storedReference = await getStorageReferenceByBlobId(blobId);
@@ -14,13 +19,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ blob
   const result = await adapter.getStoredTrace(blobId);
   if (!result.available) {
     return NextResponse.json(
-      { ok: false, message: result.error ?? "Stored trace bundle is unavailable.", data: result },
+      apiErrorPayload("STORAGE_READ_FAILED", result.error ?? "Stored trace bundle is unavailable."),
       { status: result.readStatus === "not_configured" ? 503 : result.readStatus === "invalid_json" ? 422 : 404 },
     );
   }
-  const response: PlaceholderApiResponse<typeof result> = {
+  const response: ApiSuccessResponse<typeof result> = {
     ok: true,
-    phase: "phase-2a",
     message: `Stored trace read through the ${adapter.id} adapter.`,
     data: result,
   };

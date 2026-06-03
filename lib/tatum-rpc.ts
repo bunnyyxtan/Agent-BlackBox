@@ -7,6 +7,7 @@ import {
   normalizeSuiAddress,
 } from "@/lib/sui-client-helpers";
 
+import { readResponseTextWithLimit } from "@/lib/http/safe-request";
 import { getNetworkConfig } from "@/lib/network-config";
 import type {
   ExpectedProofFields,
@@ -51,6 +52,15 @@ interface InternalTatumSuiRpcConfig {
 
 const TATUM_RPC_TIMEOUT_MS = 8_000;
 
+function parseTatumRpcPayload<T>(text: string) {
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as { result?: T; error?: TatumRpcError } | null;
+  } catch {
+    throw new Error("Tatum Sui RPC returned an invalid JSON response.");
+  }
+}
+
 function getRpcHost(rpcUrl: string) {
   if (!rpcUrl) return "Not configured";
   try {
@@ -86,10 +96,12 @@ export function getTatumSuiRpcConfig() {
 
 export async function checkTatumSuiRpcReachability() {
   const config = getInternalTatumSuiRpcConfig();
+  const checkedAt = new Date().toISOString();
   if (!config.configured) {
     return {
       configured: config.configured,
       reachable: false,
+      checkedAt,
       message: config.rpcNetworkMismatch
         ? "Tatum RPC network does not match the configured Sui network."
         : "Tatum RPC is not configured.",
@@ -114,23 +126,27 @@ export async function checkTatumSuiRpcReachability() {
       cache: "no-store",
       signal: controller.signal,
     });
-    const payload = (await response.json().catch(() => null)) as { result?: unknown; error?: TatumRpcError } | null;
+    const text = await readResponseTextWithLimit(response, 512 * 1024);
+    const payload = parseTatumRpcPayload<unknown>(text);
     if (!response.ok || payload?.error) {
       return {
         configured: true,
         reachable: false,
+        checkedAt,
         message: payload?.error?.message ?? `Tatum RPC returned HTTP ${response.status}.`,
       };
     }
     return {
       configured: true,
       reachable: payload?.result !== undefined,
+      checkedAt,
       message: payload?.result !== undefined ? "Tatum RPC is reachable." : "Tatum RPC response did not include checkpoint data.",
     };
   } catch (error) {
     return {
       configured: true,
       reachable: false,
+      checkedAt,
       message:
         error instanceof DOMException && error.name === "AbortError"
           ? "Tatum RPC reachability check timed out."
@@ -192,9 +208,8 @@ export async function callTatumSuiRpc<T = unknown>(
       cache: "no-store",
       signal: controller.signal,
     });
-    const payload = (await response.json().catch(() => null)) as
-      | { result?: T; error?: TatumRpcError }
-      | null;
+    const text = await readResponseTextWithLimit(response, 512 * 1024);
+    const payload = parseTatumRpcPayload<T>(text);
 
     if (!response.ok) {
       return {
@@ -366,6 +381,31 @@ function hasResultData(result: unknown) {
   return isRecord(result) && result.data !== null && result.data !== undefined;
 }
 
+function readObjectType(result: unknown) {
+  if (!isRecord(result) || !isRecord(result.data)) return null;
+  return typeof result.data.type === "string" ? result.data.type : null;
+}
+
+function objectTypeMatchesPackage(result: unknown, packageId: string) {
+  const type = readObjectType(result);
+  if (!type || !isValidSuiObjectId(packageId)) return null;
+  return type.startsWith(`${packageId}::`);
+}
+
+function transactionMentionsMoveTarget(
+  result: unknown,
+  proofMetadata: Pick<ProofMetadata, "packageId" | "moduleName" | "createFunction">,
+) {
+  if (!isValidSuiObjectId(proofMetadata.packageId)) return null;
+  if (!proofMetadata.moduleName || !proofMetadata.createFunction) return null;
+  const serialized = JSON.stringify(result);
+  return (
+    serialized.includes(proofMetadata.packageId) &&
+    serialized.includes(proofMetadata.moduleName) &&
+    serialized.includes(proofMetadata.createFunction)
+  );
+}
+
 export function buildLocalPhase1TatumRpcVerification(): TatumRpcVerification {
   const checkedAt = new Date().toISOString();
   return {
@@ -384,7 +424,7 @@ export function buildLocalPhase1TatumRpcVerification(): TatumRpcVerification {
 export async function verifyProofMetadata(
   proofMetadata: Pick<
     ProofMetadata,
-    "suiObjectId" | "transactionDigest" | "packageId" | "eventType"
+    "suiObjectId" | "transactionDigest" | "packageId" | "moduleName" | "createFunction" | "eventType"
   >,
   expectedFields: ExpectedProofFields,
 ): Promise<TatumRpcVerification> {
@@ -418,6 +458,9 @@ export async function verifyProofMetadata(
     ]);
     const transactionFound =
       transactionResult.status === "success" && transactionResult.result !== null;
+    const transactionTargetMatched = transactionFound
+      ? transactionMentionsMoveTarget(transactionResult.result, proofMetadata)
+      : null;
     const eventFields =
       eventResult !== null && proofMetadata.eventType
         ? readEventFields(eventResult.result, proofMetadata.eventType)
@@ -428,13 +471,28 @@ export async function verifyProofMetadata(
         : eventResult.status === "success" && eventFields !== null;
     const eventFieldComparisons =
       eventFields !== null ? compareProofFields(eventFields, expectedFields) : undefined;
+    const eventFieldsMatched =
+      eventFieldComparisons !== undefined &&
+      Object.values(eventFieldComparisons).every((value) => value === true);
+    const eventVerified = Boolean(
+      proofMetadata.eventType &&
+      eventFound === true &&
+      eventFieldsMatched &&
+      transactionTargetMatched !== false,
+    );
     const mismatchReasons = [
       ...(transactionFound ? [] : ["Tatum RPC could not find the proof-anchor transaction."]),
+      ...(transactionTargetMatched === false
+        ? ["The transaction does not appear to call the configured proof package/module/function."]
+        : []),
+      ...(proofMetadata.eventType && eventFound !== true
+        ? ["Tatum RPC could not find the AgentSessionProofCreated event."]
+        : []),
       ...getMismatchReasons(eventFieldComparisons, "The creation event"),
     ];
     const error = transactionResult.error?.message ?? eventResult?.error?.message;
     return {
-      status: transactionFound ? "transaction_found" : "failed",
+      status: eventVerified ? "passed" : transactionFound ? "transaction_found" : "failed",
       configured: true,
       onchain: true,
       checkedAt,
@@ -443,8 +501,10 @@ export async function verifyProofMetadata(
       eventFound,
       ...(eventFieldComparisons ? { eventFieldComparisons } : {}),
       ...(mismatchReasons.length ? { mismatchReasons } : {}),
-      message: transactionFound
-        ? "Tatum Sui RPC found the proof-anchor transaction. Proof object extraction is still pending."
+      message: eventVerified
+        ? "Tatum Sui RPC confirmed the proof transaction and creation event fields."
+        : transactionFound
+          ? "Transaction found, but proof object/event verification is incomplete."
         : "Tatum Sui RPC could not confirm the recorded proof-anchor transaction.",
       ...(error ? { error } : {}),
     };
@@ -456,8 +516,14 @@ export async function verifyProofMetadata(
     eventPromise,
   ]);
   const objectFound = objectResult.status === "success" && hasResultData(objectResult.result);
+  const objectPackageMatched = objectFound
+    ? objectTypeMatchesPackage(objectResult.result, proofMetadata.packageId)
+    : null;
   const transactionFound =
     transactionResult.status === "success" && transactionResult.result !== null;
+  const transactionTargetMatched = transactionFound
+    ? transactionMentionsMoveTarget(transactionResult.result, proofMetadata)
+    : null;
   const eventFound =
     eventResult === null
       ? null
@@ -480,13 +546,21 @@ export async function verifyProofMetadata(
     Object.values(eventFieldComparisons).every((value) => value === true);
   const passed =
     objectFound &&
+    objectPackageMatched !== false &&
     transactionFound &&
+    transactionTargetMatched !== false &&
     fieldsMatched &&
     (proofMetadata.eventType ? eventFound === true && eventFieldsMatched : true);
   const error = objectResult.error?.message ?? transactionResult.error?.message ?? eventResult?.error?.message;
   const mismatchReasons = [
     ...(objectFound ? [] : ["Tatum RPC could not find the Sui proof object."]),
+    ...(objectPackageMatched === false
+      ? ["The Sui proof object package does not match the configured package ID."]
+      : []),
     ...(transactionFound ? [] : ["Tatum RPC could not find the proof-anchor transaction."]),
+    ...(transactionTargetMatched === false
+      ? ["The transaction does not appear to call the configured proof package/module/function."]
+      : []),
     ...(proofMetadata.eventType && eventFound !== true
       ? ["Tatum RPC could not find the AgentSessionProofCreated event."]
       : []),

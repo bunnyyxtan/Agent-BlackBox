@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorPayload } from "@/lib/http/safe-request";
+import { guardApiRequest } from "@/lib/security/api-guard";
 import { recheckSession } from "@/lib/session-service";
-import type { PlaceholderApiResponse } from "@/types/blackbox";
+import type { ApiSuccessResponse } from "@/types/blackbox";
 
-export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await guardApiRequest(request, { profile: "strict" });
+  if (guard) return guard;
+
   const { id } = await params;
   const result = await recheckSession(id);
   if (!result) {
-    return NextResponse.json({ ok: false, message: "Session not found." }, { status: 404 });
+    return NextResponse.json(apiErrorPayload("SESSION_NOT_FOUND", "Session not found."), { status: 404 });
   }
 
-  const response: PlaceholderApiResponse<typeof result> = {
+  const response: ApiSuccessResponse<typeof result> = {
     ok: true,
-    phase: "phase-2d",
     message: "Stored trace and Sui proof read-only verification rerun completed.",
     data: result,
   };

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { apiErrorPayload, BODY_SIZE_LIMITS, readJsonRequest, SafeRequestError, safeRequestErrorPayload } from "@/lib/http/safe-request";
+import { guardApiRequest } from "@/lib/security/api-guard";
 import { storeTraceBundleWithFallback, type TraceBundle } from "@/lib/storage-adapters";
 import { WalrusHttpError } from "@/lib/walrus";
-import type { PlaceholderApiResponse, StorageMode } from "@/types/blackbox";
+import type { ApiSuccessResponse, StorageMode } from "@/types/blackbox";
 
 function formatUploadAdapterLabel(adapter: string) {
   if (adapter === "walrus_mainnet_upload_relay") return "Walrus Mainnet Upload Relay";
@@ -21,10 +23,15 @@ interface UploadRequest {
 }
 
 export async function POST(request: Request) {
+  const guard = await guardApiRequest(request, { profile: "strict" });
+  if (guard) return guard;
+
   try {
-    const body = (await request.json()) as UploadRequest;
+    const body = await readJsonRequest<UploadRequest>(request, {
+      maxBytes: BODY_SIZE_LIMITS.storageJson,
+    });
     if (!body.traceBundle?.trace) {
-      return NextResponse.json({ ok: false, message: "traceBundle.trace is required." }, { status: 400 });
+      return NextResponse.json(apiErrorPayload("TRACE_BUNDLE_REQUIRED", "traceBundle.trace is required."), { status: 400 });
     }
 
     const storage = await storeTraceBundleWithFallback(
@@ -35,9 +42,8 @@ export async function POST(request: Request) {
       },
       body.storageProvider,
     );
-    const response: PlaceholderApiResponse<typeof storage> = {
+    const response: ApiSuccessResponse<typeof storage> = {
       ok: true,
-      phase: "phase-2a",
       message: storage.warning
         ? `Trace bundle stored with warning: ${storage.warning}`
         : `Trace bundle stored through the ${formatUploadAdapterLabel(storage.uploadAdapter)} adapter.`,
@@ -45,8 +51,11 @@ export async function POST(request: Request) {
     };
     return NextResponse.json(response);
   } catch (error) {
+    if (error instanceof SafeRequestError) {
+      return NextResponse.json(safeRequestErrorPayload(error), { status: error.statusCode });
+    }
     if (error instanceof WalrusHttpError) {
-      return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.statusCode });
+      return NextResponse.json(apiErrorPayload(error.code, error.message), { status: error.statusCode });
     }
     throw error;
   }

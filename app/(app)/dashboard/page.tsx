@@ -14,7 +14,7 @@ export default async function DashboardPage() {
     (session) => session.storage.storageProvider !== "local" && session.verification.directWalrusReadPassed,
   ).length;
   const suiAnchored = sessions.filter(
-    (session) => session.proof.status === "anchored" || session.proof.status === "anchored_pending_object" || session.proof.status === "verified",
+    (session) => session.proof.status === "anchored" || session.proof.status === "verified",
   ).length;
   const fullyVerified = sessions.filter(
     (session) => session.verification.directWalrusReadPassed && session.verification.tatumRpcPassed,

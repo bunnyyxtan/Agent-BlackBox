@@ -612,8 +612,17 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        session: prepared.session,
-        storage,
+        uploadJobId: storage.uploadJobId,
+        blobId: storage.blobId,
+        blobObjectId: storage.blobObjectId,
+        storageEpochs: storage.storageEpochs,
+        storageMode,
+        storageEndEpoch: storage.storageEndEpoch,
+        relayUrl: storage.relayUrl,
+        aggregatorUrl: storage.aggregatorUrl,
+        feeEstimate: storage.feeEstimate,
+        tipConfig: storage.tipConfig,
+        warning: storage.warning,
       }),
     });
     const finalized = await readJsonResponse<FinalizeStoragePayload>(finalizeResponse, endpoint);
