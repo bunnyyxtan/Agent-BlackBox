@@ -171,8 +171,8 @@ export default function LandingPage() {
               },
               {
                 icon: "solar:chart-line-duotone",
-                title: "Onchain Analyzer Agent",
-                desc: "Analyzes Sui wallet, object, package, or transaction context and records a certified proof trail.",
+                title: "Sui Onchain Analyzer",
+                desc: "Reads Sui wallet, object, package, or transaction context and seals the RPC evidence trail.",
               },
               {
                 icon: "solar:verified-check-line-duotone",

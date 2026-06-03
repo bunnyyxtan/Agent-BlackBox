@@ -4,13 +4,13 @@ import type { CreateSessionInput } from "@/types/blackbox";
 // fallback: unknown session IDs must remain unknown.
 export const seedSessionInputs: CreateSessionInput[] = [
   {
-    id: "abx-research-market",
-    title: "Research market evidence trail",
-    prompt: "Build a source-aware research brief for the market evidence, record key findings, and prepare the trace for independent replay.",
+    id: "abx-research-walrus",
+    title: "Research Walrus trace storage",
+    prompt: "Explain how Walrus can store sealed Agent BlackBox trace bundles, support readback verification, and preserve evidence for independent replay.",
     agentMode: "research",
     storageEpochs: 5,
     createdAt: "2026-05-30T14:24:00.000Z",
-    files: [{ name: "market-signal-notes.md", type: "text/markdown", size: 32768 }],
+    files: [{ name: "walrus-trace-notes.md", type: "text/markdown", size: 32768 }],
   },
   {
     id: "abx-delivery-verify",
@@ -32,8 +32,8 @@ export const seedSessionInputs: CreateSessionInput[] = [
   },
   {
     id: "abx-chain-monitor",
-    title: "Trace onchain monitor escalation",
-    prompt: "Record the analyzer escalation path for the anomalous Sui activity and produce a verifiable operator summary.",
+    title: "Analyze Sui wallet holdings",
+    prompt: "Read the supplied Sui wallet through public Sui RPC, summarize token holdings, and seal the analyzer evidence trail.",
     agentMode: "onchain_monitor",
     storageEpochs: 5,
     createdAt: "2026-05-27T11:06:00.000Z",

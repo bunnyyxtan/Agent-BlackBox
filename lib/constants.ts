@@ -63,7 +63,7 @@ export const AGENT_MODE_LABELS: Record<AgentMode, string> = {
   research: "Research Agent",
   risk_review: "Risk Review Agent",
   delivery_proof: "Delivery Proof Agent",
-  onchain_monitor: "Onchain Analyzer Agent",
+  onchain_monitor: "Sui Onchain Analyzer",
 };
 
 export function getSuiExplorerObjectUrl(objectId: string) {

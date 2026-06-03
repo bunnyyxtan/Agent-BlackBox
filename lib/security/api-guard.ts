@@ -38,7 +38,7 @@ function isGuardEnabled() {
 function protectedError(
   status: number,
   code: "UNAUTHORIZED" | "RATE_LIMITED",
-  message = "This demo endpoint is protected.",
+  message = "This endpoint is protected.",
 ) {
   return NextResponse.json(
     {

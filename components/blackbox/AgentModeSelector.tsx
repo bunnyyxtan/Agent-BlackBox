@@ -79,7 +79,7 @@ export function AgentModeSelector({
                     selected ? "text-indigo-400" : "text-zinc-500 group-hover:text-indigo-300"
                   }`}
                 />
-                {id === "onchain_monitor" ? "Onchain Analyzer" : AGENT_MODE_LABELS[id]}
+                {AGENT_MODE_LABELS[id]}
               </div>
               <p className="mb-4 text-xs font-light leading-relaxed text-zinc-400">
                 {simpleMeaning}
