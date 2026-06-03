@@ -49,10 +49,10 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════
           HERO
       ════════════════════════════════════════════════════════ */}
-      <section className="relative pt-44 pb-32 px-6 lg:px-10">
+      <section className="relative px-4 pb-20 pt-32 sm:px-6 sm:pb-28 sm:pt-40 lg:px-10 lg:pb-32 lg:pt-44">
         <div className="max-w-5xl mx-auto text-center">
           {/* Eyebrow */}
-          <div className="reveal inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-sm mb-10">
+          <div className="reveal mb-8 inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.02] px-4 py-1.5 backdrop-blur-sm sm:mb-10">
             <span className="relative flex h-2 w-2">
               <span className="ring absolute inline-flex h-full w-full rounded-full bg-indigo-400" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-400" />
@@ -64,19 +64,19 @@ export default function LandingPage() {
 
           {/* Headline */}
           <h1
-            className="reveal text-5xl sm:text-7xl lg:text-[5.5rem] leading-[0.95] tracking-tight text-white font-light mb-8"
+            className="reveal mb-8 text-4xl font-light leading-[0.98] tracking-tight text-white sm:text-6xl lg:text-[5.5rem] lg:leading-[0.95]"
             style={{ transitionDelay: "0.1s" }}
           >
             The flight recorder for
             <br />
-            <span className="serif italic text-6xl sm:text-8xl lg:text-[6.5rem] gradient-text">
+            <span className="serif gradient-text text-5xl italic sm:text-7xl lg:text-[6.5rem]">
               autonomous AI agents
             </span>
           </h1>
 
           {/* Subheadline */}
           <p
-            className="reveal max-w-2xl mx-auto text-lg sm:text-xl font-light text-zinc-400 leading-relaxed mb-12"
+            className="reveal mx-auto mb-10 max-w-2xl text-base font-light leading-relaxed text-zinc-400 sm:mb-12 sm:text-xl"
             style={{ transitionDelay: "0.2s" }}
           >
             Use an AI agent, get the result, and receive a verifiable BlackBox
@@ -87,7 +87,7 @@ export default function LandingPage() {
 
           {/* CTAs */}
           <div
-            className="reveal flex flex-col sm:flex-row items-center justify-center gap-4"
+            className="reveal flex flex-col items-center justify-center gap-4 sm:flex-row"
             style={{ transitionDelay: "0.3s" }}
           >
             <Link
@@ -97,7 +97,7 @@ export default function LandingPage() {
               onClick={() => setPendingHref("/sessions/new")}
               onFocus={() => router.prefetch("/sessions/new")}
               onMouseEnter={() => router.prefetch("/sessions/new")}
-              className="group w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-medium text-zinc-900 bg-white px-7 py-3.5 rounded-full hover:shadow-[0_0_40px_-5px_rgba(255,255,255,0.6)] transition-all"
+              className="group flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-medium text-zinc-900 transition-all hover:shadow-[0_0_40px_-5px_rgba(255,255,255,0.6)] sm:w-auto"
             >
               {pendingHref === "/sessions/new" ? "Opening Agent..." : "Use Agent"}
               <iconify-icon
@@ -109,7 +109,7 @@ export default function LandingPage() {
             </Link>
             <a
               href="#verify"
-              className="w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-light text-zinc-300 border border-white/10 px-7 py-3.5 rounded-full hover:bg-white/[0.03] hover:border-white/20 transition-all"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/10 px-7 py-3.5 text-sm font-light text-zinc-300 transition-all hover:border-white/20 hover:bg-white/[0.03] sm:w-auto"
             >
               <iconify-icon
                 icon="solar:shield-check-line-duotone"
@@ -121,7 +121,7 @@ export default function LandingPage() {
 
           {/* ── Code panel / trace preview ── */}
           <div
-            className="reveal mt-24 max-w-3xl mx-auto flex justify-center"
+            className="reveal mx-auto mt-14 flex max-w-3xl justify-center sm:mt-24"
             style={{ transitionDelay: "0.4s" }}
           >
             <LiveAgentProcess />
@@ -139,13 +139,13 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════
           AGENTS
       ════════════════════════════════════════════════════════ */}
-      <section id="agents" className="relative py-32 px-6 lg:px-10">
+      <section id="agents" className="relative px-4 py-20 sm:px-6 sm:py-28 lg:px-10 lg:py-32">
         <div className="max-w-7xl mx-auto">
           <div className="max-w-2xl mb-20">
             <p className="reveal mono text-xs text-indigo-400 tracking-widest uppercase mb-5">
               / Agents
             </p>
-            <h2 className="reveal text-4xl sm:text-5xl font-light tracking-tight text-white leading-tight">
+            <h2 className="reveal text-3xl font-light leading-tight tracking-tight text-white sm:text-5xl">
               Choose an agent.{" "}
               <span className="serif italic">
                 Every action gets a proof trail.
@@ -201,13 +201,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="how" className="relative py-32 px-6 lg:px-10">
+      <section id="how" className="relative px-4 py-20 sm:px-6 sm:py-28 lg:px-10 lg:py-32">
         <div className="max-w-7xl mx-auto">
           <div className="max-w-2xl mb-16">
             <p className="reveal mono text-xs text-indigo-400 tracking-widest uppercase mb-5">
               / How It Works
             </p>
-            <h2 className="reveal text-4xl sm:text-5xl font-light tracking-tight text-white leading-tight">
+            <h2 className="reveal text-3xl font-light leading-tight tracking-tight text-white sm:text-5xl">
               Store on Walrus. Anchor on Sui.{" "}
               <span className="serif italic">Verify through Tatum RPC.</span>
             </h2>
@@ -221,14 +221,14 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════
           BLACKBOX TRACE
       ════════════════════════════════════════════════════════ */}
-      <section id="trace" className="relative py-32 px-6 lg:px-10">
+      <section id="trace" className="relative px-4 py-20 sm:px-6 sm:py-28 lg:px-10 lg:py-32">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
           {/* Left: text */}
           <div>
             <p className="reveal mono text-xs text-indigo-400 tracking-widest uppercase mb-5">
               / BlackBox Trace
             </p>
-            <h2 className="reveal text-4xl sm:text-5xl font-light tracking-tight text-white leading-tight mb-6">
+            <h2 className="reveal mb-6 text-3xl font-light leading-tight tracking-tight text-white sm:text-5xl">
               Every agent session becomes{" "}
               <span className="serif italic">sealed evidence</span>.
             </h2>
@@ -400,13 +400,13 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════
           STORAGE
       ════════════════════════════════════════════════════════ */}
-      <section id="storage" className="relative py-32 px-6 lg:px-10">
+      <section id="storage" className="relative px-4 py-20 sm:px-6 sm:py-28 lg:px-10 lg:py-32">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-20">
             <p className="reveal mono text-xs text-indigo-400 tracking-widest uppercase mb-5">
               / Storage
             </p>
-            <h2 className="reveal text-4xl sm:text-5xl font-light tracking-tight text-white leading-tight">
+            <h2 className="reveal text-3xl font-light leading-tight tracking-tight text-white sm:text-5xl">
               Walrus storage.{" "}
               <span className="serif italic">Direct verification.</span>
             </h2>
@@ -476,20 +476,20 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════
           DEVELOPERS
       ════════════════════════════════════════════════════════ */}
-      <section id="developers" className="relative py-32 px-6 lg:px-10">
+      <section id="developers" className="relative px-4 py-20 sm:px-6 sm:py-28 lg:px-10 lg:py-32">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-20">
             <p className="reveal mono text-xs text-indigo-400 tracking-widest uppercase mb-5">
               / Developers
             </p>
-            <h2 className="reveal text-4xl sm:text-5xl font-light tracking-tight text-white leading-tight">
+            <h2 className="reveal text-3xl font-light leading-tight tracking-tight text-white sm:text-5xl">
               A proof stack built for{" "}
               <span className="serif italic">AI accountability.</span>
             </h2>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            <div className="reveal card-hover rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-9 hover:border-indigo-500/30 floating">
+            <div className="reveal card-hover floating rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-6 hover:border-indigo-500/30 sm:p-9">
               <ProtocolLogo protocol="walrus" size="lg" className="mb-6" />
               <h3 className="text-2xl font-light text-white tracking-tight mb-3">
                 Walrus Blob Storage
@@ -501,7 +501,7 @@ export default function LandingPage() {
               </p>
             </div>
             <div
-              className="reveal card-hover rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-9 hover:border-emerald-500/30 floating"
+              className="reveal card-hover floating rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-6 hover:border-emerald-500/30 sm:p-9"
               style={{ animationDelay: "1s" }}
             >
               <div className="mb-6 flex items-center gap-2">
@@ -518,7 +518,7 @@ export default function LandingPage() {
               </p>
             </div>
             <div
-              className="reveal card-hover rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-9 hover:border-indigo-500/30 floating"
+              className="reveal card-hover floating rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-6 hover:border-indigo-500/30 sm:p-9"
               style={{ animationDelay: "2s" }}
             >
               <iconify-icon
@@ -540,12 +540,12 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════
           VERIFY PROOF
       ════════════════════════════════════════════════════════ */}
-      <section id="verify" className="relative py-32 px-6 lg:px-10">
+      <section id="verify" className="relative px-4 py-20 sm:px-6 sm:py-28 lg:px-10 lg:py-32">
         <div className="max-w-4xl mx-auto text-center">
           <p className="reveal mono text-xs text-indigo-400 tracking-widest uppercase mb-5">
             / Verify Proof
           </p>
-          <h2 className="reveal text-4xl sm:text-6xl font-light tracking-tight text-white leading-tight mb-6">
+          <h2 className="reveal mb-6 text-3xl font-light leading-tight tracking-tight text-white sm:text-6xl">
             Proof you can{" "}
             <span className="serif italic gradient-text">replay.</span>
           </h2>
@@ -555,7 +555,7 @@ export default function LandingPage() {
             RPC.
           </p>
 
-          <div className="reveal grid sm:grid-cols-3 gap-4 text-left mb-12">
+          <div className="reveal mb-12 grid gap-4 text-left sm:grid-cols-2 md:grid-cols-3">
             {[
               {
                 icon: "solar:cloud-storage-line-duotone",
@@ -632,13 +632,13 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════
           TAMPER TEST
       ════════════════════════════════════════════════════════ */}
-      <section id="tamper" className="relative py-32 px-6 lg:px-10">
+      <section id="tamper" className="relative px-4 py-20 sm:px-6 sm:py-28 lg:px-10 lg:py-32">
         <div className="max-w-5xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <p className="reveal mono text-xs text-indigo-400 tracking-widest uppercase mb-5">
               / Tamper Test
             </p>
-            <h2 className="reveal text-4xl sm:text-5xl font-light tracking-tight text-white leading-tight">
+            <h2 className="reveal text-3xl font-light leading-tight tracking-tight text-white sm:text-5xl">
               Change the output.{" "}
               <span className="serif italic">Break the proof.</span>
             </h2>
@@ -651,7 +651,7 @@ export default function LandingPage() {
 
           <div className="reveal grid sm:grid-cols-2 gap-5">
             {/* Verified */}
-            <div className="card-hover rounded-3xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.05] to-transparent p-8">
+            <div className="card-hover rounded-3xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.05] to-transparent p-5 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <span className="text-sm font-medium text-white tracking-tight">
                   Original BlackBox trace
@@ -684,7 +684,7 @@ export default function LandingPage() {
             </div>
 
             {/* Tampered */}
-            <div className="card-hover rounded-3xl border border-red-500/25 bg-gradient-to-b from-red-500/[0.06] to-transparent p-8">
+            <div className="card-hover rounded-3xl border border-red-500/25 bg-gradient-to-b from-red-500/[0.06] to-transparent p-5 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <span className="text-sm font-medium text-white tracking-tight">
                   Modified local trace
@@ -722,18 +722,18 @@ export default function LandingPage() {
       {/* ════════════════════════════════════════════════════════
           CTA
       ════════════════════════════════════════════════════════ */}
-      <section id="cta" className="relative py-32 px-6 lg:px-10">
+      <section id="cta" className="relative px-4 py-20 sm:px-6 sm:py-28 lg:px-10 lg:py-32">
         <div className="max-w-5xl mx-auto reveal">
-          <div className="relative rounded-[2.5rem] border border-white/10 overflow-hidden bg-gradient-to-b from-indigo-950/30 to-[#08080c] p-12 sm:p-20 text-center glow">
+          <div className="glow relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-b from-indigo-950/30 to-[#08080c] p-6 text-center sm:rounded-[2.5rem] sm:p-20">
             <div
-              className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full pointer-events-none"
+              className="pointer-events-none absolute left-1/2 top-0 h-[260px] w-[260px] -translate-x-1/2 rounded-full sm:h-[400px] sm:w-[400px]"
               style={{
                 background:
                   "radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 60%)",
               }}
             />
             <div className="relative">
-              <h2 className="text-4xl sm:text-6xl font-light tracking-tight text-white leading-[1.05] mb-6">
+              <h2 className="mb-6 text-3xl font-light leading-[1.05] tracking-tight text-white sm:text-6xl">
                 Use an agent with
                 <br />
                 <span className="serif italic gradient-text">

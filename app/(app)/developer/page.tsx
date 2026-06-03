@@ -144,7 +144,7 @@ export default async function DeveloperPage() {
           <div className="mt-4 space-y-1.5">
             {apiRoutes.map((route) => (
               <div
-                className="rounded-lg border border-white/[0.06] bg-white/[0.025] px-3 py-2 font-mono text-xs text-slate-400"
+                className="rounded-lg border border-white/[0.06] bg-white/[0.025] px-3 py-2 font-mono text-xs text-slate-400 [overflow-wrap:anywhere]"
                 key={route}
               >
                 {route}
@@ -170,7 +170,7 @@ export default async function DeveloperPage() {
 
       <div className="mt-6 grid gap-5 xl:grid-cols-2">
         <GlassCard className="p-5">
-          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
               <ProtocolLogo protocol="tatum" size="md" />
               <div>
@@ -182,16 +182,16 @@ export default async function DeveloperPage() {
           </div>
           <dl className="mt-4 space-y-3 text-xs">
             {tatumRpcRows.map(([label, value]) => (
-              <div className="flex items-start justify-between gap-3 border-b border-white/[0.06] pb-3 last:border-0 last:pb-0" key={label}>
+              <div className="flex flex-col gap-1 border-b border-white/[0.06] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3" key={label}>
                 <dt className="text-slate-500">{label}</dt>
-                <dd className="max-w-[70%] break-words text-right font-mono text-slate-300">{value}</dd>
+                <dd className="font-mono text-slate-300 [overflow-wrap:anywhere] sm:max-w-[70%] sm:text-right">{value}</dd>
               </div>
             ))}
           </dl>
         </GlassCard>
 
         <GlassCard className="p-5">
-          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
               <ProtocolLogo protocol="walrus" size="md" />
               <div>
@@ -203,9 +203,9 @@ export default async function DeveloperPage() {
           </div>
           <dl className="mt-4 space-y-3 text-xs">
             {walrusRows.map(([label, value]) => (
-              <div className="flex items-start justify-between gap-3 border-b border-white/[0.06] pb-3 last:border-0 last:pb-0" key={label}>
+              <div className="flex flex-col gap-1 border-b border-white/[0.06] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3" key={label}>
                 <dt className="text-slate-500">{label}</dt>
-                <dd className="max-w-[70%] break-words text-right font-mono text-slate-300">{value}</dd>
+                <dd className="font-mono text-slate-300 [overflow-wrap:anywhere] sm:max-w-[70%] sm:text-right">{value}</dd>
               </div>
             ))}
           </dl>
@@ -241,9 +241,9 @@ export default async function DeveloperPage() {
               ["Last check", tatumMcp.checkedAt],
               ...(tatumMcp.details ? [["Last safe error", tatumMcp.details]] : []),
             ].map(([label, value]) => (
-              <div className="flex items-start justify-between gap-3 border-b border-white/[0.06] pb-3 last:border-0 last:pb-0" key={label}>
+              <div className="flex flex-col gap-1 border-b border-white/[0.06] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3" key={label}>
                 <dt className="text-slate-500">{label}</dt>
-                <dd className="max-w-[70%] break-words text-right font-mono text-slate-300">{value}</dd>
+                <dd className="font-mono text-slate-300 [overflow-wrap:anywhere] sm:max-w-[70%] sm:text-right">{value}</dd>
               </div>
             ))}
           </dl>

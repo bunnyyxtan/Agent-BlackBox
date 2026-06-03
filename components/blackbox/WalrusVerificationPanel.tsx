@@ -20,13 +20,13 @@ export function WalrusVerificationPanel({
   ];
 
   return (
-    <GlassCard className="p-5">
-      <div className="flex items-start justify-between gap-3">
+    <GlassCard className="min-w-0 p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <ProtocolLogo protocol="walrus" size="md" />
-          <div>
-          <p className="eyebrow">Blob-Level Evidence</p>
-          <h3 className="mt-2 text-base font-semibold text-white">Direct Walrus Verification</h3>
+          <div className="min-w-0">
+            <p className="eyebrow">Blob-Level Evidence</p>
+            <h3 className="mt-2 text-base font-semibold text-white">Direct Walrus Verification</h3>
           </div>
         </div>
         <StatusBadge status={verification.readStatus} />
@@ -34,7 +34,7 @@ export function WalrusVerificationPanel({
       <div className="mt-5 space-y-2">
         {rows.map(({ label, value, icon: Icon, protocol }) => (
           <div
-            className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] bg-white/[0.025] px-3 py-2.5"
+            className="flex flex-col gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             key={label}
           >
             <span className="flex items-center gap-2 text-xs text-slate-500">
@@ -45,12 +45,12 @@ export function WalrusVerificationPanel({
               ) : null}
               {label}
             </span>
-            <span className="font-mono text-xs text-slate-300">{value}</span>
+            <span className="font-mono text-xs text-slate-300 [overflow-wrap:anywhere]">{value}</span>
           </div>
         ))}
       </div>
       {verification.error && <p className="mt-4 text-xs leading-5 text-amber-100/75">{verification.error}</p>}
-      <div className="mt-4 flex items-center justify-between border-t border-white/[0.07] pt-4">
+      <div className="mt-4 flex flex-col gap-2 border-t border-white/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs text-slate-500">Replay readiness</span>
         <StatusBadge
           status={verification.readStatus === "available" && verification.hashMatched ? "Ready" : "Prepared"}

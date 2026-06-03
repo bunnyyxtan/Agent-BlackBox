@@ -76,16 +76,16 @@ export function StorageRelayStatusCard({
 
   return (
     <GlassCard className="mt-6 border-cyan/15 bg-cyan/[0.04] p-5">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <ProtocolLogo protocol="walrus" size="md" />
-        <div>
+        <div className="min-w-0">
           <h2 className="text-sm font-semibold text-white">Walrus SDK Relay architecture</h2>
           <p className="mt-1 text-xs leading-5 text-slate-400">
             Agent BlackBox stores trace bundles on {walrusNetworkLabel} through the official SDK
             Upload Relay. Connected wallets pay storage and gas; relay status loads after navigation
             so the storage page is never blocked by network checks.
           </p>
-          <div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
+          <div className="mt-3 grid gap-2 text-xs text-slate-400 md:grid-cols-3">
             <span className="flex flex-wrap items-center gap-2">
               Upload Relay:
               <StatusBadge status={relayStatus} size="sm" />
@@ -99,7 +99,7 @@ export function StorageRelayStatusCard({
               <StatusBadge status={tipStatus} size="sm" />
             </span>
           </div>
-          <p className="mt-3 text-xs leading-5 text-cyan/80">{message}</p>
+          <p className="mt-3 text-xs leading-5 text-cyan/80 [overflow-wrap:anywhere]">{message}</p>
         </div>
       </div>
     </GlassCard>

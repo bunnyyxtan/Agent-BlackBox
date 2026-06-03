@@ -61,7 +61,7 @@ export function AgentModeSelector({
             key={id}
             type="button"
             onClick={() => onChange(id)}
-            className={`group relative flex flex-col items-start rounded-2xl border p-5 text-left transition-all duration-300 ${
+            className={`group relative flex min-h-44 flex-col items-start rounded-2xl border p-4 text-left transition-all duration-300 sm:p-5 ${
               selected
                 ? "border-indigo-500/50 bg-indigo-500/[0.08] shadow-[0_0_30px_-5px_rgba(99,102,241,0.2)]"
                 : "border-white/10 bg-white/[0.02] hover:border-indigo-500/30 hover:bg-white/[0.04]"

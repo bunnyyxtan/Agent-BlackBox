@@ -43,10 +43,10 @@ function formatPendingPlaceholder(value: string) {
 
 function EvidenceRow({ badge = false, label, value }: { badge?: boolean; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] py-3 last:border-0">
+    <div className="flex flex-col gap-2 border-b border-white/[0.06] py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <span className="text-xs text-slate-500">{label}</span>
-      <span className="flex min-w-0 items-center gap-2">
-        <span className="truncate font-mono text-xs text-slate-300" title={badge ? formatStatusLabel(value) : value}>
+      <span className="flex min-w-0 items-center justify-between gap-2 sm:justify-end">
+        <span className="min-w-0 font-mono text-xs text-slate-300 [overflow-wrap:anywhere]" title={badge ? formatStatusLabel(value) : value}>
           {badge ? <StatusBadge status={value} size="sm" /> : value.length > 34 ? shortHash(value, 12, 9) : value}
         </span>
         <CopyButton value={value} compact />
@@ -110,7 +110,7 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
   }
 
   const actionButtonBase =
-    "inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-full px-4 text-[0.7rem] font-semibold uppercase tracking-[0.12em] transition sm:h-11 sm:px-5";
+    "inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-full px-4 text-center text-[0.7rem] font-semibold uppercase tracking-[0.12em] transition sm:px-5";
   const primaryActionClass = `${actionButtonBase} bg-white text-zinc-950 hover:bg-indigo-100 hover:shadow-[0_0_32px_-10px_rgba(255,255,255,0.72)]`;
   const secondaryActionClass = `${actionButtonBase} border border-white/10 bg-white/[0.025] text-zinc-300 hover:border-white/20 hover:bg-white/[0.055]`;
   const utilityActionClass = `${actionButtonBase} border border-white/[0.08] bg-black/20 px-3 text-zinc-400 hover:border-cyan/25 hover:bg-cyan/[0.045] hover:text-cyan sm:px-4`;
@@ -179,12 +179,12 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
             { label: "Result Hash", value: session.trace.resultHash, icon: Link2 },
             { label: "Owner Wallet", value: session.ownerAddress ?? "Local Check", icon: RadioTower },
           ].map(({ label, value, icon: Icon }) => (
-            <GlassCard className="p-4" key={label}>
+            <GlassCard className="min-w-0 p-4" key={label}>
               <Icon className="h-4 w-4 text-cyan" />
               <p className="mt-4 text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
                 {label}
               </p>
-              <p className="mt-1.5 truncate font-mono text-xs text-slate-200" title={value}>
+              <p className="mt-1.5 font-mono text-xs text-slate-200 [overflow-wrap:anywhere]" title={value}>
                 {shortHash(value, 12, 8)}
               </p>
             </GlassCard>
@@ -211,12 +211,12 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.72fr)]">
           <GlassCard className="p-5">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-start gap-3">
                 <ProtocolLogo protocol="walrus" size="md" />
                 <div>
-                <p className="eyebrow">Walrus Storage</p>
-                <h2 className="mt-2 text-base font-semibold text-white">Blob Storage Reference</h2>
+                  <p className="eyebrow">Walrus Storage</p>
+                  <h2 className="mt-2 text-base font-semibold text-white">Blob Storage Reference</h2>
                 </div>
               </div>
               <StatusBadge status={session.storage.storageStatus} />
@@ -249,12 +249,12 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
             </div>
           </GlassCard>
           <GlassCard className="p-5">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-start gap-3">
                 <ProtocolLogo protocol="sui" size="md" />
                 <div>
-                <p className="eyebrow">Sui Evidence</p>
-                <h2 className="mt-2 text-base font-semibold text-white">Proof Anchor</h2>
+                  <p className="eyebrow">Sui Evidence</p>
+                  <h2 className="mt-2 text-base font-semibold text-white">Proof Anchor</h2>
                 </div>
               </div>
               <StatusBadge status={formatProofStatus(session.proof.status)} />
@@ -283,7 +283,7 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
                 href={suiTransactionUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white"
+                className="mt-3 inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white"
               >
                 Open Sui transaction
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -295,7 +295,7 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
             )}
             <Link
               href={`/verify/${session.id}`}
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white"
+              className="mt-3 inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white"
             >
               Inspect proof bundle
               <ExternalLink className="h-3.5 w-3.5" />

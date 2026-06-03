@@ -32,7 +32,7 @@ export default async function DashboardPage() {
         <Link 
           href="/sessions/new" 
           prefetch
-          className="group flex shrink-0 items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-medium text-zinc-900 transition-all hover:bg-indigo-100 hover:shadow-[0_0_30px_-5px_rgba(255,255,255,0.5)]"
+          className="group flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-medium text-zinc-900 transition-all hover:bg-indigo-100 hover:shadow-[0_0_30px_-5px_rgba(255,255,255,0.5)] sm:w-auto"
         >
           <iconify-icon icon="solar:play-circle-line-duotone" className="text-lg group-hover:scale-110 transition-transform" />
           Use Agent

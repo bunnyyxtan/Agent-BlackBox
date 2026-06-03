@@ -29,7 +29,7 @@ export function CopyButton({
       className={
         className ??
         (compact
-          ? "inline-flex items-center gap-1 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white"
+          ? "inline-flex min-h-8 items-center gap-1 rounded-full px-1 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white sm:min-h-0 sm:px-0"
           : "button-secondary")
       }
     >

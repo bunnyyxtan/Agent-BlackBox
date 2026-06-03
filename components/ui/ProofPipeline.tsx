@@ -55,11 +55,11 @@ export function ProofPipeline() {
       {/* Horizontal connecting line hidden on mobile, visible on lg */}
       <div className="absolute top-24 left-10 right-10 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent hidden lg:block" />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-5">
         {STEPS.map((step, i) => (
           <GlassCard
             key={step.num}
-            className={`group relative p-7 overflow-hidden transition-all duration-500 hover:-translate-y-2 ${step.glow}`}
+            className={`group relative overflow-hidden p-5 transition-all duration-500 hover:-translate-y-2 sm:p-7 ${step.glow}`}
             style={{ transitionDelay: `${i * 0.05}s` }}
           >
             {/* Soft background glow on hover */}

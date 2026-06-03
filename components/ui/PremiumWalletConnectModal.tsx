@@ -72,7 +72,7 @@ export function PremiumWalletConnectModal({ open, onOpenChange }: PremiumWalletC
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[2147483647] grid place-items-center bg-black/70 px-4 py-8 backdrop-blur-xl"
+      className="fixed inset-0 z-[2147483647] grid place-items-center bg-black/70 px-3 py-4 backdrop-blur-xl sm:px-4 sm:py-8"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onOpenChange(false);
@@ -82,10 +82,10 @@ export function PremiumWalletConnectModal({ open, onOpenChange }: PremiumWalletC
         aria-modal="true"
         role="dialog"
         aria-labelledby="wallet-connect-title"
-        className="relative w-full max-w-[27rem] overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#07070c]/95 p-[1px] text-left shadow-[0_30px_120px_-55px_rgba(99,102,241,0.65)]"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-[27rem] overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#07070c]/95 p-[1px] text-left shadow-[0_30px_120px_-55px_rgba(99,102,241,0.65)] sm:rounded-[1.75rem]"
       >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(99,102,241,0.22),transparent_34%),radial-gradient(circle_at_90%_10%,rgba(34,211,238,0.16),transparent_34%)]" />
-        <div className="relative rounded-[1.68rem] bg-[#08080d]/95 p-5 backdrop-blur-2xl sm:p-6">
+        <div className="relative max-h-[calc(100dvh-2.2rem)] overflow-y-auto rounded-[1.42rem] bg-[#08080d]/95 p-4 backdrop-blur-2xl sm:rounded-[1.68rem] sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="font-mono text-[0.64rem] font-semibold uppercase tracking-[0.22em] text-indigo-300">
@@ -125,7 +125,7 @@ export function PremiumWalletConnectModal({ open, onOpenChange }: PremiumWalletC
                     type="button"
                     onClick={() => connectWallet(wallet)}
                     disabled={Boolean(connectingWallet)}
-                    className="group flex w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3 text-left transition duration-300 hover:border-indigo-300/35 hover:bg-indigo-500/[0.09] hover:shadow-[0_0_28px_-18px_rgba(99,102,241,0.8)] disabled:cursor-wait disabled:opacity-70"
+                    className="group flex min-h-14 w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3 text-left transition duration-300 hover:border-indigo-300/35 hover:bg-indigo-500/[0.09] hover:shadow-[0_0_28px_-18px_rgba(99,102,241,0.8)] disabled:cursor-wait disabled:opacity-70"
                     key={walletKey(wallet)}
                   >
                     <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-black/20">

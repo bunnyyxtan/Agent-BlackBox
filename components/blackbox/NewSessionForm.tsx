@@ -778,10 +778,10 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
                 </div>
                 {activeRerunPrefill && (
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    <button type="button" className="button-secondary" onClick={clearRerunPrefill}>
+                    <button type="button" className="button-secondary w-full sm:w-auto" onClick={clearRerunPrefill}>
                       Clear prefill
                     </button>
-                    <Link href={`/sessions/${activeRerunPrefill.sourceSessionId}`} className="button-secondary">
+                    <Link href={`/sessions/${activeRerunPrefill.sourceSessionId}`} className="button-secondary w-full sm:w-auto">
                       View original session
                     </Link>
                   </div>
@@ -790,7 +790,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
             </div>
           )}
 
-          <GlassCard className="p-6 sm:p-8">
+          <GlassCard className="p-5 sm:p-8">
             <div>
               <p className="mb-2 font-mono text-xs uppercase tracking-widest text-indigo-400">Agent Task</p>
               <h2 className="text-xl font-medium tracking-tight text-white">Agent parameters</h2>
@@ -821,7 +821,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
                   value={prompt}
                   onChange={(event) => setPrompt(event.target.value)}
                   placeholder="Record the decision path, inspect the attached evidence metadata, and generate an auditable operator summary."
-                  className="w-full resize-y rounded-xl border border-white/10 bg-[#050507] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
+                  className="min-h-36 w-full resize-y rounded-xl border border-white/10 bg-[#050507] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
                 />
               </label>
               <div>
@@ -866,7 +866,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         </div>
 
         <aside className="space-y-6">
-          <GlassCard className="p-6">
+          <GlassCard className="p-5 sm:p-6">
             <p className="mb-4 font-mono text-xs uppercase tracking-widest text-indigo-400">Storage Policy</p>
             <p className="mb-4 text-xs leading-5 text-zinc-400">
               Your wallet will pay a small Walrus storage + Sui gas fee. Keep a small SUI/WAL balance
@@ -901,7 +901,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
             </div>
           </GlassCard>
 
-          <GlassCard className="group relative overflow-hidden border-indigo-500/20 bg-gradient-to-b from-indigo-500/5 to-transparent p-6">
+          <GlassCard className="group relative overflow-hidden border-indigo-500/20 bg-gradient-to-b from-indigo-500/5 to-transparent p-5 sm:p-6">
             <div className="pointer-events-none absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-[0.03]" />
 
             <div className="relative mb-5 flex items-center gap-2 text-indigo-400">
@@ -910,8 +910,8 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
             </div>
 
             <div className="relative rounded-2xl border border-white/[0.08] bg-black/20 p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-white">
                     {activeExecutionStep?.label ?? (completedStepCount === EXECUTION_STEPS.length ? "Trace sealed" : "Trace ready")}
                   </p>
@@ -921,7 +921,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
                       : "The forensic timeline updates in the execution workspace below."}
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full border border-cyan-300/20 bg-cyan-300/[0.08] px-2.5 py-1 font-mono text-[0.58rem] uppercase tracking-[0.14em] text-cyan-100">
+                  <span className="w-fit shrink-0 rounded-full border border-cyan-300/20 bg-cyan-300/[0.08] px-2.5 py-1 font-mono text-[0.58rem] uppercase tracking-[0.14em] text-cyan-100">
                   {completedStepCount}/{EXECUTION_STEPS.length}
                 </span>
               </div>
@@ -939,7 +939,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
                 { label: "Walrus Mainnet", value: executionProgress.some((step) => step.id === "uploading" && step.status === "error") ? "Action Needed" : "Ready", protocol: "walrus" as Protocol },
                 { label: "Sui proof", value: proofContractConfigured ? "Configured" : "Contract Pending", protocol: "sui" as Protocol },
               ].map(({ label, protocol, value }) => (
-                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2" key={label}>
+                <div className="flex flex-col gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 sm:flex-row sm:items-center sm:justify-between" key={label}>
                   <span className="inline-flex min-w-0 items-center gap-2 text-xs text-zinc-400">
                     {protocol && <ProtocolLogo protocol={protocol} size="sm" />}
                     {label}
@@ -966,7 +966,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
                 <ProtocolLogo protocol="sui" size="md" />
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-white">Session owner connected</p>
-                  <p className="mt-1 truncate font-mono text-[0.68rem] text-zinc-400">
+                  <p className="mt-1 font-mono text-[0.68rem] text-zinc-400 [overflow-wrap:anywhere]">
                     {shortenSuiAddress(walletAccount.address)} / {getNetworkConfig(walletNetwork).displayNetwork}
                   </p>
                 </div>

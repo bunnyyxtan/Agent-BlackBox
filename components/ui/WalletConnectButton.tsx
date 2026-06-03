@@ -44,8 +44,8 @@ export function WalletConnectButton({
   const connecting = mounted && (connection.isConnecting || connection.isReconnecting);
 
   const baseClasses = `
-    group relative inline-flex items-center justify-center gap-2 rounded-full 
-    backdrop-blur-md transition-all duration-300 focus-visible:outline-none 
+    group relative inline-flex min-h-11 items-center justify-center gap-2 rounded-full
+    backdrop-blur-md transition-all duration-300 focus-visible:outline-none
     focus-visible:ring-2 active:scale-[0.98] overflow-hidden
     ${fullWidth ? "w-full" : "w-auto"}
   `;
@@ -73,7 +73,7 @@ export function WalletConnectButton({
     setMenuOpen(false);
   }
 
-function updateMenuPosition() {
+  function updateMenuPosition() {
     if (!triggerRef.current || typeof window === "undefined") return;
     const trigger = triggerRef.current.getBoundingClientRect();
     const menuHeight = menuRef.current?.offsetHeight ?? 230;

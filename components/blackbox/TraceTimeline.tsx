@@ -34,8 +34,8 @@ export function TraceTimeline({
               </div>
 
               <div className="min-w-0 flex-1 pt-1">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className={`text-sm font-medium tracking-tight transition-colors ${isComplete ? 'text-zinc-200 group-hover:text-white' : 'text-indigo-200 group-hover:text-indigo-100'}`}>
+                <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2">
+                  <p className={`min-w-0 text-sm font-medium tracking-tight transition-colors [overflow-wrap:anywhere] ${isComplete ? 'text-zinc-200 group-hover:text-white' : 'text-indigo-200 group-hover:text-indigo-100'}`}>
                     {item.label}
                   </p>
                   <span className="font-mono text-[0.65rem] text-zinc-600 group-hover:text-zinc-400 transition-colors">
@@ -43,7 +43,7 @@ export function TraceTimeline({
                   </span>
                 </div>
                 {!compact && (
-                  <p className="mt-1.5 text-xs font-light leading-relaxed text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                  <p className="mt-1.5 text-xs font-light leading-relaxed text-zinc-500 transition-colors [overflow-wrap:anywhere] group-hover:text-zinc-400">
                     {item.description}
                   </p>
                 )}
@@ -52,7 +52,7 @@ export function TraceTimeline({
                 {item.metadata && Object.keys(item.metadata).length > 0 && !compact && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {Object.entries(item.metadata).map(([key, val]) => (
-                      <span key={key} className="inline-flex items-center gap-1 rounded-md border border-white/5 bg-white/[0.02] px-2 py-1 font-mono text-[0.6rem] text-zinc-400">
+                      <span key={key} className="inline-flex max-w-full items-center gap-1 rounded-md border border-white/5 bg-white/[0.02] px-2 py-1 font-mono text-[0.6rem] text-zinc-400 [overflow-wrap:anywhere]">
                         <span className="text-zinc-600">{key}:</span> {String(val)}
                       </span>
                     ))}

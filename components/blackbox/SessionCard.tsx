@@ -8,20 +8,20 @@ import type { AgentSession } from "@/types/blackbox";
 
 export function SessionCard({ session }: { session: AgentSession }) {
   return (
-    <GlassCard className="flex h-full flex-col p-5 transition hover:border-indigo-500/30 hover:bg-white/[0.04] card-hover">
+    <GlassCard className="card-hover flex h-full min-w-0 flex-col p-5 transition hover:border-indigo-500/30 hover:bg-white/[0.04]">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="eyebrow">{AGENT_MODE_LABELS[session.agentMode]}</p>
-          <h3 className="mt-2 text-sm font-medium text-white">{session.title}</h3>
+          <h3 className="mt-2 text-sm font-medium text-white [overflow-wrap:anywhere]">{session.title}</h3>
         </div>
         <StatusBadge status={getSessionEvidenceStatus(session)} />
       </div>
       <div className="mt-5 grid gap-2 text-xs font-light text-zinc-500 sm:grid-cols-2">
-        <span className="flex items-center gap-1.5">
+        <span className="flex min-w-0 items-center gap-1.5">
           <Clock3 className="h-3.5 w-3.5" />
           {formatDate(session.createdAt)}
         </span>
-        <span className="flex items-center gap-1.5 mono">
+        <span className="mono flex min-w-0 items-center gap-1.5 [overflow-wrap:anywhere]">
           <Fingerprint className="h-3.5 w-3.5" />
           {shortHash(session.trace.traceHash)}
         </span>

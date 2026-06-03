@@ -844,7 +844,7 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
           {specialist && <SpecialistReportSection report={specialist} />}
 
           <section>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Findings
@@ -972,9 +972,9 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
                     ]
                   : []),
               ].map(({ label, value, copyValue }) => (
-                <div key={label} className="flex min-w-0 items-start justify-between gap-3 border-b border-white/[0.05] pb-3 last:border-0 last:pb-0">
+                <div key={label} className="flex min-w-0 flex-col gap-1 border-b border-white/[0.05] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <dt className="text-slate-500">{label}</dt>
-                  <dd className="min-w-0 text-right font-mono text-slate-300">
+                  <dd className="min-w-0 font-mono text-slate-300 sm:text-right">
                     <span className="break-words [overflow-wrap:anywhere]">{value}</span>
                     {copyValue && (
                       <span className="mt-1 block">
@@ -1022,7 +1022,7 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
                 { label: "Sui anchor", status: formatProofStatus(session.proof.status) },
                 { label: "Tatum RPC", status: formatTatumRpcStatus(session.tatumRpc.status) },
               ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between gap-3">
+                <div key={item.label} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <span className="text-xs text-slate-500">{item.label}</span>
                   <StatusBadge status={item.status} />
                 </div>
@@ -1043,9 +1043,9 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
                 { label: "Transaction digest", value: shortHash(session.proof.transactionDigest, 11, 8), copyValue: session.proof.transactionDigest },
                 { label: "Package", value: shortHash(session.proof.packageId, 11, 8), copyValue: session.proof.packageId },
               ].map(({ label, value, copyValue }) => (
-                <div key={label} className="flex min-w-0 items-start justify-between gap-3 border-b border-white/[0.05] pb-3 last:border-0 last:pb-0">
+                <div key={label} className="flex min-w-0 flex-col gap-1 border-b border-white/[0.05] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <dt className="text-slate-500">{label}</dt>
-                  <dd className="min-w-0 text-right font-mono text-slate-300">
+                  <dd className="min-w-0 font-mono text-slate-300 sm:text-right">
                     <span className="break-words [overflow-wrap:anywhere]">{value}</span>
                     {copyValue && (
                       <span className="mt-1 block">

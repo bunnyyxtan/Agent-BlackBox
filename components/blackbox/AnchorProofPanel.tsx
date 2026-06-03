@@ -152,10 +152,10 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
 
   return (
     <GlassCard className="border-cyan/15 bg-cyan/[0.025] p-5">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <ProtocolLogo protocol="sui" size="md" />
-          <div>
+          <div className="min-w-0">
             <p className="eyebrow">Wallet-Signed Sui Action</p>
             <h2 className="mt-2 text-base font-semibold text-white">Anchor Proof on Sui</h2>
           </div>
@@ -181,7 +181,7 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
                 <p className="text-[0.62rem] font-semibold uppercase tracking-[0.13em] text-emerald-100/50">
                   Transaction digest
                 </p>
-                <p className="truncate font-mono text-[0.68rem] text-emerald-100/70" title={proof.transactionDigest}>
+                <p className="font-mono text-[0.68rem] text-emerald-100/70 [overflow-wrap:anywhere]" title={proof.transactionDigest}>
                   {proof.transactionDigest}
                 </p>
               </div>
@@ -190,7 +190,7 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
                   <p className="text-[0.62rem] font-semibold uppercase tracking-[0.13em] text-emerald-100/50">
                     Proof object
                   </p>
-                  <p className="truncate font-mono text-[0.68rem] text-emerald-100/70" title={proof.suiObjectId}>
+                  <p className="font-mono text-[0.68rem] text-emerald-100/70 [overflow-wrap:anywhere]" title={proof.suiObjectId}>
                     {proof.suiObjectId}
                   </p>
                 </div>
@@ -200,7 +200,7 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
                   href={explorerUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white"
+                  className="mt-2 inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white"
                 >
                   Open Sui transaction
                   <ExternalLink className="h-3.5 w-3.5" />
@@ -214,7 +214,7 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
                 type="button"
                 onClick={recheckProof}
                 disabled={rechecking}
-                className="mt-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-3 flex min-h-10 items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${rechecking ? "animate-spin" : ""}`} />
                 {rechecking ? "Rechecking Proof..." : "Recheck Proof"}
@@ -234,7 +234,7 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
               type="button"
               onClick={anchorProof}
               disabled={submitting || Boolean(prerequisiteMessage)}
-              className="button-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-45"
+              className="button-primary min-h-11 w-full justify-center disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Anchor className="h-4 w-4" />
               {submitting ? "Anchoring proof..." : retrying ? "Retry Anchor" : "Anchor Proof on Sui"}

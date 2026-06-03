@@ -18,7 +18,7 @@ export default async function SessionsPage() {
           </h1>
           <p className="muted mt-2">Inspect replayable agent evidence and proof preparation status.</p>
         </div>
-        <Link href="/sessions/new" prefetch className="button-primary">
+        <Link href="/sessions/new" prefetch className="button-primary w-full sm:w-auto">
           <PlusCircle className="h-4 w-4" />
           Use Agent
         </Link>

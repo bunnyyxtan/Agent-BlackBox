@@ -8,18 +8,18 @@ const COPYRIGHT_YEAR = 2026;
 
 export function Footer() {
   return (
-    <footer className="relative border-t border-white/5 bg-[#050507] overflow-hidden pt-16 pb-8">
+    <footer className="relative overflow-hidden border-t border-white/5 bg-[#050507] pb-8 pt-12 sm:pt-16">
       {/* Subtle top border glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent"></div>
       
       {/* Background radial */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-indigo-900/10 blur-[120px] rounded-[100%] pointer-events-none"></div>
 
-      <div className="relative mx-auto max-w-7xl px-6 lg:px-10 z-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
+        <div className="mb-12 grid grid-cols-1 gap-10 md:mb-16 md:grid-cols-4 md:gap-12">
           {/* Brand Summary */}
           <div className="md:col-span-2 space-y-4">
-            <Link href="/" prefetch className="flex items-center gap-3 group inline-flex">
+            <Link href="/" prefetch className="group inline-flex items-center gap-3">
               <AgentBlackBoxLogo size="sm" />
               <span className="font-semibold tracking-tight text-white">{APP_NAME}</span>
             </Link>
@@ -28,7 +28,7 @@ export function Footer() {
             </p>
             
             {/* Animated Status Strip */}
-            <div className="inline-flex items-center gap-3 px-4 py-2 mt-4 rounded-full border border-emerald-500/20 bg-emerald-500/5">
+            <div className="mt-4 inline-flex max-w-full items-center gap-3 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-4 py-2">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="text-xs font-mono text-emerald-400/80 uppercase tracking-widest">Network Operational</span>
             </div>
@@ -55,13 +55,13 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-white/5 gap-4">
+        <div className="flex flex-col items-start justify-between gap-4 border-t border-white/5 pt-8 md:flex-row md:items-center">
           <p className="text-xs font-light text-zinc-500">
             &copy; {COPYRIGHT_YEAR} Agent BlackBox. All rights reserved.
           </p>
           
           {/* Proof Stack */}
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-6">
             <span className="text-xs font-mono text-zinc-600 uppercase tracking-widest">Powered by</span>
             <div className="flex items-center gap-4 text-zinc-400">
               <ProtocolLogo protocol="sui" size="sm" />

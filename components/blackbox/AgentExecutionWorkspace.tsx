@@ -174,7 +174,7 @@ function TraceMetadataStrip({
               {label}
             </p>
           </div>
-          <p className="mt-1 truncate text-xs font-medium text-zinc-200">{value}</p>
+          <p className="mt-1 text-xs font-medium text-zinc-200 [overflow-wrap:anywhere]">{value}</p>
         </div>
       ))}
     </div>
@@ -186,8 +186,8 @@ function ExecutionStepCard({ index, isLast, step }: { index: number; isLast: boo
   const protocol = step.id === "uploading" ? "walrus" : undefined;
 
   return (
-    <div className="relative pl-9">
-      {!isLast && <span className={`absolute left-[0.72rem] top-11 h-full w-px ${classes.rail}`} />}
+    <div className="relative pl-8 sm:pl-9">
+      {!isLast && <span className={`absolute bottom-[-0.75rem] left-[0.72rem] top-11 w-px ${classes.rail}`} />}
       <span
         className={`absolute left-0 top-5 flex h-6 w-6 items-center justify-center rounded-full border ${classes.node}`}
       >
@@ -213,7 +213,7 @@ function ExecutionStepCard({ index, isLast, step }: { index: number; isLast: boo
               <StatusBadge status={statusLabel[step.status]} size="sm" />
             </div>
             <h4 className="mt-2 text-sm font-semibold text-inherit">{step.label}</h4>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-500 group-hover:text-zinc-400">
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-zinc-500 [overflow-wrap:anywhere] group-hover:text-zinc-400">
               {step.detail}
             </p>
           </div>
@@ -278,7 +278,7 @@ function ProofMiniCards({ steps }: { steps: AgentExecutionStep[] }) {
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 {protocol && <ProtocolLogo protocol={protocol} size="sm" />}
-                <p className="truncate text-xs font-semibold text-inherit">{title}</p>
+                <p className="text-xs font-semibold text-inherit [overflow-wrap:anywhere]">{title}</p>
               </div>
               <span className="font-mono text-[0.56rem] uppercase tracking-[0.14em] text-current opacity-70">
                 {formatStatusLabel(state)}
@@ -419,7 +419,7 @@ export function AgentExecutionWorkspace({
   return (
     <section className="relative overflow-hidden rounded-[1.9rem] border border-white/10 bg-[#06060b] p-[1px] shadow-[0_32px_120px_-60px_rgba(99,102,241,0.65)]">
       <div className="pointer-events-none absolute inset-0 animate-[consoleBorder_9s_linear_infinite] bg-[conic-gradient(from_180deg_at_50%_50%,rgba(103,232,249,0),rgba(103,232,249,0.28),rgba(129,140,248,0.24),rgba(103,232,249,0))] opacity-60 motion-reduce:animate-none" />
-      <div className="relative overflow-hidden rounded-[1.82rem] bg-[#07070c]/96 p-5 backdrop-blur-xl sm:p-6 lg:p-7">
+      <div className="relative overflow-hidden rounded-[1.82rem] bg-[#07070c]/96 p-4 backdrop-blur-xl sm:p-6 lg:p-7">
         <div className="pointer-events-none absolute inset-0 grain opacity-[0.08]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-28 animate-[consoleScan_4.5s_ease-in-out_infinite] bg-gradient-to-b from-cyan-300/10 via-cyan-300/[0.035] to-transparent blur-md motion-reduce:animate-none" />

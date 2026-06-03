@@ -107,7 +107,7 @@ export function VerifySessionClient({ session }: { session: AgentSession }) {
             </span>
             <div className="min-w-0">
               <p className="eyebrow">Independent Verification Report</p>
-              <h1 className={`mt-2 text-2xl font-semibold ${titleClass}`}>
+              <h1 className={`mt-2 text-xl font-semibold [overflow-wrap:anywhere] sm:text-2xl ${titleClass}`}>
                 {verificationPresentation.title}
               </h1>
               <p className={`mt-2 text-sm ${warning ? "text-amber-100/75" : "text-slate-400"}`}>
@@ -122,7 +122,7 @@ export function VerifySessionClient({ session }: { session: AgentSession }) {
               type="button"
               onClick={recheckProof}
               disabled={recheckLoading}
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-cyan/15 bg-cyan/[0.035] px-4 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${recheckLoading ? "animate-spin" : ""}`} />
               {recheckLoading ? "Rechecking Proof..." : "Recheck Proof"}

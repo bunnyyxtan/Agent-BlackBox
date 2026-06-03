@@ -114,12 +114,12 @@ export function ReadinessPanel() {
 
   return (
     <GlassCard className="mt-5 overflow-hidden border-indigo-400/15 bg-indigo-500/[0.025]">
-      <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] px-5 py-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 border-b border-white/[0.08] px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <span className="rounded-xl border border-indigo-300/15 bg-indigo-300/[0.07] p-2 text-indigo-200">
             <ShieldCheck className="h-4 w-4" />
           </span>
-          <div>
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-white">Deployment readiness</h2>
             <p className="mt-0.5 text-xs text-slate-500">
               Server-side checks load after navigation and never print secrets.
