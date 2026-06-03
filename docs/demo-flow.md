@@ -40,4 +40,4 @@ the record is valuable.”
 - If Walrus upload fails, re-run from the Walrus storage step; sealed agent steps stay preserved.
 - If Sui anchoring returns a transaction digest but no proof object ID, the session stays pending until
   Tatum RPC can verify the object or event.
-- If Tatum MCP is disabled, Sui proof verification is unaffected; MCP is only optional EVM/multichain enrichment.
+- If Etherscan V2 is not configured, Sui proof verification is unaffected; EVM enrichment runs as a preliminary report.

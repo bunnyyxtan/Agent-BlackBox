@@ -200,7 +200,6 @@ function titleCase(value: string) {
     .replace(/\bapi\b/gi, "API")
     .replace(/\bjson\b/gi, "JSON")
     .replace(/\bwalrus\b/gi, "Walrus")
-    .replace(/\bmcp\b/gi, "MCP")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 

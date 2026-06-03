@@ -51,7 +51,7 @@ function formatMarkdownList(items: string[]) {
 }
 
 function isLegacyProviderName(value: string) {
-  return /\b(etherscan|moralis|alchemy|covalent|chainbase)\b/i.test(value);
+  return /\b(moralis|alchemy|covalent|chainbase)\b/i.test(value);
 }
 
 function formatProviderList(values: string[]) {
@@ -66,24 +66,24 @@ function getOnchainProviderDisplay(onchain: OnchainAnalysis | undefined) {
   );
   if (headerProviders.length > 0) return headerProviders.join(", ");
 
-  const tatumSource = onchain.dataSources.find((source) => source.name === "Tatum MCP");
-  if (tatumSource) {
-    return tatumSource.used || tatumSource.status === "used" || tatumSource.status === "partial"
-      ? "Tatum MCP"
-      : "Tatum MCP unavailable";
+  const etherscanSource = onchain.dataSources.find((source) => source.name === "Etherscan V2");
+  if (etherscanSource) {
+    return etherscanSource.used || etherscanSource.status === "used" || etherscanSource.status === "partial"
+      ? "Etherscan V2"
+      : "Etherscan V2 attempted";
   }
   return "None";
 }
 
-function isPreliminaryEvmWithMcpFailure(onchain: OnchainAnalysis | undefined) {
+function isPreliminaryEvmWithProviderFailure(onchain: OnchainAnalysis | undefined) {
   if (!onchain || onchain.detected.family !== "evm") return false;
   return onchain.header.enrichmentStatus === "preliminary"
-    && onchain.dataSources.some((source) => source.name === "Tatum MCP" && source.status === "failed");
+    && onchain.dataSources.some((source) => source.name === "Etherscan V2" && (source.status === "failed" || source.status === "not_configured"));
 }
 
-function getPreliminaryMcpWarning(onchain: OnchainAnalysis | undefined) {
-  if (!onchain || !isPreliminaryEvmWithMcpFailure(onchain)) return "";
-  return `Live ${onchain.header.detectedChain} enrichment could not run through Tatum MCP. This report is preliminary.`;
+function getPreliminaryProviderWarning(onchain: OnchainAnalysis | undefined) {
+  if (!onchain || !isPreliminaryEvmWithProviderFailure(onchain)) return "";
+  return "Live EVM enrichment could not be completed with Etherscan V2. This report is preliminary.";
 }
 
 function isNoisyPreliminaryFinding(title: string) {
@@ -92,7 +92,7 @@ function isNoisyPreliminaryFinding(title: string) {
 
 function getUserFacingFindings(report: StructuredReport) {
   const onchain = report.onchainAnalysis;
-  if (!isPreliminaryEvmWithMcpFailure(onchain)) return report.findings;
+  if (!isPreliminaryEvmWithProviderFailure(onchain)) return report.findings;
   const filtered = report.findings.filter((finding) => !isNoisyPreliminaryFinding(finding.title));
   return filtered.length > 0 ? filtered : report.findings.slice(0, 1);
 }
@@ -274,16 +274,17 @@ function buildMarkdownReport(session: AgentSession) {
           `- ${tool.toolName} [${formatStatusLabel(tool.status)}]: ${tool.purpose} ${tool.outputSummary}`,
       )
       .join("\n"),
-    ...(onchain?.mcpToolCalls?.length
+    ...(onchain?.providerEvidence?.length
       ? [
           "",
-          "## Tatum MCP Tool Evidence",
-          ...onchain.mcpToolCalls
+          "## Etherscan V2 Provider Evidence",
+          ...onchain.providerEvidence
             .map((call) =>
               [
-                `### Tatum MCP - ${call.toolName}`,
+                `### Etherscan V2 - ${call.actionName}`,
                 "",
                 `- Network: ${call.network ?? "Not recorded"}`,
+                `- Chain ID: ${call.chainId ?? "Not recorded"}`,
                 `- Target: ${call.target ?? "Not recorded"}`,
                 `- Status: ${formatStatusLabel(call.status)}`,
                 `- Result used in report: ${formatStatusLabel(call.resultUsedInReport ? "yes" : "no")}`,
@@ -409,10 +410,10 @@ function getToolPresentation(toolName: string) {
       detail: "Checked the detected wallet, object, transaction, or contract context using the configured chain data source.",
     };
   }
-  if (normalized.includes("tatum mcp")) {
+  if (normalized.includes("etherscan")) {
     return {
-      action: "Tatum MCP tool call",
-      detail: "Recorded an EVM or multichain enrichment tool call returned by Tatum MCP.",
+      action: "Etherscan V2 provider call",
+      detail: "Recorded EVM enrichment evidence returned by Etherscan V2.",
     };
   }
   if (normalized.includes("specialistagentcontext")) {
@@ -452,7 +453,7 @@ function getToolPresentation(toolName: string) {
 }
 
 function isDebugProviderText(value: string) {
-  return /not_configured|api_key|base_url|moralis|alchemy|covalent|chainbase|etherscan|live data section/i.test(value);
+  return /not_configured|api_key|base_url|moralis|alchemy|covalent|chainbase|live data section/i.test(value);
 }
 
 function getVisibleToolCalls(report: NonNullable<AgentSession["trace"]["structuredOutput"]>) {
@@ -660,7 +661,7 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
   const promptPreview = getPromptPreview(session.prompt, promptExpanded);
   const visibleToolCalls = report ? getVisibleToolCalls(report) : [];
   const userFacingFindings = report ? getUserFacingFindings(report) : [];
-  const preliminaryMcpWarning = getPreliminaryMcpWarning(onchain);
+  const preliminaryProviderWarning = getPreliminaryProviderWarning(onchain);
   const dataSourceSummary = getDataSourceSummary(session, onchain);
   const suiTransactionUrl = buildSuiExplorerUrl(
     "transaction",
@@ -819,9 +820,9 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
                 </div>
                 <StatusBadge status={onchain.header.enrichmentStatus} />
               </div>
-              {preliminaryMcpWarning && (
+              {preliminaryProviderWarning && (
                 <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.055] p-3 text-xs leading-5 text-amber-100">
-                  {preliminaryMcpWarning}
+                  {preliminaryProviderWarning}
                 </div>
               )}
               <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">

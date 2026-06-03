@@ -77,10 +77,10 @@ export interface OnchainExplorerLink {
   url: string;
 }
 
-export interface OnchainMcpToolEvidence {
-  provider: "Tatum MCP";
-  packageName: "@tatumio/blockchain-mcp";
-  toolName: string;
+export interface OnchainProviderEvidence {
+  provider: "Etherscan V2";
+  actionName: string;
+  chainId?: number;
   network?: string;
   target?: string;
   status: "completed" | "failed" | "skipped";
@@ -98,19 +98,15 @@ export interface OnchainMcpToolEvidence {
   };
 }
 
-export interface OnchainMcpStatusSnapshot {
-  enabled: boolean;
+export interface EtherscanProviderStatusSnapshot {
   configured: boolean;
-  status: "disabled" | "configured" | "missing_api_key" | "package_unavailable" | "runtime_unavailable";
-  provider: "Tatum Blockchain MCP";
-  packageName: "@tatumio/blockchain-mcp";
-  command: string;
-  serverName: string;
+  status: "configured" | "missing_api_key" | "unavailable";
+  provider: "Etherscan V2";
   apiKeyPresent: boolean;
+  baseUrlHost: string;
   nodeVersion?: string;
   checkedAt: string;
   message: string;
-  availableTools?: string[];
   details?: string;
 }
 
@@ -142,8 +138,8 @@ export interface MultichainOnchainReport {
     notes: string[];
   };
   explorerLinks: OnchainExplorerLink[];
-  mcpStatus?: OnchainMcpStatusSnapshot;
-  mcpToolCalls?: OnchainMcpToolEvidence[];
+  etherscanStatus?: EtherscanProviderStatusSnapshot;
+  providerEvidence?: OnchainProviderEvidence[];
 }
 
 export interface OnchainAnalyzeRequest {

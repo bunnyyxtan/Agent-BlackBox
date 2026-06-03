@@ -21,12 +21,10 @@ visibly unconfigured or failed.
 | `SUI_EXPLORER_BASE_URL` | Server-only | `https://suivision.xyz` | Server-generated explorer links |
 | `NEXT_PUBLIC_SUI_EXPLORER_BASE_URL` | Public | `https://suivision.xyz` | Mainnet explorer links |
 | `OPENAI_API_KEY` | Secret, server-only | user-provided | Agent Runtime |
-| `TATUM_API_KEY` | Secret, server-only | user-provided | Tatum Sui Mainnet RPC and Tatum MCP authentication |
+| `TATUM_API_KEY` | Secret, server-only | user-provided | Tatum Sui Mainnet RPC authentication |
 | `TATUM_SUI_RPC_URL` | Server-only | `https://sui-mainnet.gateway.tatum.io` | Proof object, transaction, and event reads |
-| `TATUM_MCP_ENABLED` | Server-only | `false` by default | Optional EVM/multichain analyzer enrichment |
-| `TATUM_MCP_COMMAND` | Server-only | `npx` | Tatum MCP local package runner |
-| `TATUM_MCP_PACKAGE` | Server-only | `@tatumio/blockchain-mcp` | Tatum MCP package |
-| `TATUM_MCP_SERVER_NAME` | Server-only | `tatumio` | Tatum MCP server label |
+| `ETHERSCAN_API_KEY` | Secret, server-only | user-provided | EVM wallet and transaction enrichment |
+| `ETHERSCAN_V2_BASE_URL` | Server-only | `https://api.etherscan.io/v2/api` | Etherscan V2 API endpoint |
 | `STORAGE_PROVIDER` | Server-only | `walrus_sdk_relay` | Default storage adapter |
 | `WALRUS_NETWORK` | Server-only | `mainnet` | Walrus network label |
 | `WALRUS_UPLOAD_RELAY_URL` | Server-only | `https://upload-relay.mainnet.walrus.space` | Wallet-paid SDK upload relay |
@@ -108,11 +106,8 @@ SUI_NETWORK=mainnet
 OPENAI_API_KEY=<your-agent-runtime-key>
 TATUM_API_KEY=<your-tatum-api-key>
 TATUM_SUI_RPC_URL=https://sui-mainnet.gateway.tatum.io
-# Set to true only when EVM/multichain analysis should use Tatum MCP.
-TATUM_MCP_ENABLED=false
-TATUM_MCP_COMMAND=npx
-TATUM_MCP_PACKAGE=@tatumio/blockchain-mcp
-TATUM_MCP_SERVER_NAME=tatumio
+ETHERSCAN_API_KEY=<your-etherscan-v2-api-key>
+ETHERSCAN_V2_BASE_URL=https://api.etherscan.io/v2/api
 
 STORAGE_PROVIDER=walrus_sdk_relay
 STORAGE_ADAPTER=

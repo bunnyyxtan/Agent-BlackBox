@@ -85,12 +85,11 @@ addresses, EVM transaction hashes, EVM contract context, and EVM chain mentions.
 specialized proof chain for Agent BlackBox; EVM support is additional enrichment captured inside the
 sealed trace.
 
-Provider absence is not treated as a useless failure. Sui targets use Sui public RPC only. EVM and
-multichain targets use Tatum Blockchain MCP only when it is enabled and available. If Tatum MCP is
-disabled, missing its server-only API key, unavailable, or times out, the analyzer returns a professional
-preliminary EVM report without exposing raw env names or falling back to Etherscan/Moralis/Alchemy/
-Covalent/Chainbase. It does not fabricate wallet balances, transfers, object state, token activity,
-contract verification, or suspicious behavior.
+Provider absence is not treated as a useless failure. Sui targets use Sui public RPC only. EVM targets
+use Etherscan V2 when the server-side key is configured. If Etherscan V2 is missing, unavailable, or
+returns no usable data, the analyzer returns a professional preliminary EVM report without exposing
+raw env names or falling back to Moralis/Alchemy/Covalent/Chainbase. It does not fabricate wallet
+balances, transfers, object state, token activity, contract verification, or suspicious behavior.
 
 Sui analyzer enrichment uses only Sui JSON-RPC in this version. `SUI_RPC_URL` defaults server-side to
 the official public Mainnet fullnode `https://fullnode.mainnet.sui.io:443` when missing. No Sui API key,

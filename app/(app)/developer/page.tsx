@@ -1,9 +1,9 @@
-import { Braces, Boxes, Database, Network, Waves } from "lucide-react";
+import { Boxes, Database, Network, Search, Waves } from "lucide-react";
 
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { getTatumMcpStatus } from "@/lib/mcp/tatum-mcp";
+import { getEtherscanV2Status } from "@/lib/onchain/providers/etherscan-v2";
 import { getUploadRelayTipConfig } from "@/lib/storage-adapters/walrus-sdk-relay";
 import { checkTatumSuiRpcReachability, getTatumSuiRpcConfig } from "@/lib/tatum-rpc";
 import { getWalrusConfiguration, getWalrusNetworkLabel } from "@/lib/walrus";
@@ -32,9 +32,9 @@ const architecture = [
     icon: Network,
   },
   {
-    title: "Tatum MCP",
-    detail: "Active EVM and multichain analyzer provider through Tatum Blockchain MCP tools.",
-    icon: Braces,
+    title: "Etherscan V2",
+    detail: "EVM wallet and transaction enrichment through Etherscan V2 where configured.",
+    icon: Search,
   },
 ];
 
@@ -56,7 +56,6 @@ const apiRoutes = [
   "POST /api/sessions/[id]/proof-anchor",
   "POST /api/sessions/[id]/storage-finalize",
   "GET  /api/verify/[id]",
-  "POST /api/mcp/verify",
 ];
 
 const integrationChecklist = [
@@ -67,7 +66,7 @@ const integrationChecklist = [
   "Sui proof anchors are signed in the browser by the connected wallet.",
   "Digest-only anchors remain pending until object or event verification succeeds.",
   "Proof verification compares session ID, owner, hashes, Walrus Blob ID, object, transaction, and event fields.",
-  "EVM and multichain analysis use Tatum Blockchain MCP only when explicitly enabled.",
+  "EVM wallet and transaction enrichment uses Etherscan V2 when configured.",
 ];
 
 function yesNo(value: boolean) {
@@ -85,13 +84,13 @@ function getTatumRpcStatus(
 }
 
 export default async function DeveloperPage() {
-  const [tatumMcp, tatumRpcReachability, walrusRelay] = await Promise.all([
-    getTatumMcpStatus(),
+  const [tatumRpcReachability, walrusRelay] = await Promise.all([
     checkTatumSuiRpcReachability(),
     getUploadRelayTipConfig(),
   ]);
   const tatumRpc = getTatumSuiRpcConfig();
   const walrus = getWalrusConfiguration();
+  const etherscan = getEtherscanV2Status();
   const tatumRpcRows = [
     ["Status", getTatumRpcStatus(tatumRpc, tatumRpcReachability)],
     ["Network", tatumRpc.network === "sui-mainnet" ? "Sui Mainnet" : "Sui Testnet"],
@@ -109,6 +108,15 @@ export default async function DeveloperPage() {
     ["Relay reachable", walrusRelay.reachable ? "Reachable" : "Unavailable"],
     ["Relay tip", walrusRelay.tipRequirement === "send_tip" ? "Available" : walrusRelay.tipRequirement === "no_tip" ? "Not Required" : "Unavailable"],
     ["Last check", walrusRelay.checkedAt],
+  ];
+  const etherscanRows = [
+    ["Status", etherscan.configured ? "Configured" : "Missing API Key"],
+    ["Provider", etherscan.provider],
+    ["Mode", "EVM wallet/transaction enrichment"],
+    ["API key present", yesNo(etherscan.apiKeyPresent)],
+    ["Base URL host", etherscan.baseUrlHost],
+    ["Last check", etherscan.checkedAt],
+    ["Last result", etherscan.message],
   ];
 
   return (
@@ -227,24 +235,10 @@ export default async function DeveloperPage() {
           </p>
         </GlassCard>
         <GlassCard className="p-5">
-          <p className="eyebrow">Tatum MCP Diagnostics</p>
+          <p className="eyebrow">Etherscan V2 Diagnostics</p>
           <h2 className="mt-2 text-base font-semibold text-white">EVM provider status</h2>
           <dl className="mt-4 space-y-3 text-xs">
-            {[
-              ["Status", tatumMcp.message],
-              ["Node version", tatumMcp.nodeVersion ?? "Not available"],
-              ["MCP enabled", tatumMcp.enabled ? "Yes" : "No"],
-              ["API key present", tatumMcp.apiKeyPresent ? "Yes" : "No"],
-              ["Package available", tatumMcp.status === "package_unavailable" ? "No" : "Yes"],
-              ["Command", tatumMcp.command],
-              ["Package", tatumMcp.packageName],
-              ["Server", tatumMcp.serverName],
-              ...(tatumMcp.availableTools?.length
-                ? [["Available tools", tatumMcp.availableTools.join(", ")]]
-                : []),
-              ["Last check", tatumMcp.checkedAt],
-              ...(tatumMcp.details ? [["Last safe error", tatumMcp.details]] : []),
-            ].map(([label, value]) => (
+            {etherscanRows.map(([label, value]) => (
               <div className="flex flex-col gap-1 border-b border-white/[0.06] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3" key={label}>
                 <dt className="text-slate-500">{label}</dt>
                 <dd className="font-mono text-slate-300 [overflow-wrap:anywhere] sm:max-w-[70%] sm:text-right">{value}</dd>

@@ -168,7 +168,7 @@ This should be the strongest judge-facing moment because it makes the product va
 
 ## Hybrid Architecture
 
-The product intentionally combines four distinct technical paths plus one optional future layer.
+The product intentionally combines four distinct technical paths plus EVM enrichment.
 Do not blur these responsibilities together.
 
 ### 1. Canonical Storage and Verification: Walrus Blob Storage
@@ -243,12 +243,11 @@ Use Tatum Sui RPC server-side for:
 - Confirming owner and network.
 - Supporting the verification report.
 
-### 6. Optional Future Layer: Tatum MCP
+### 6. EVM Enrichment: Etherscan V2
 
-Tatum MCP is an optional AI-assisted verification layer. Its future role is to inspect proof bundles,
-wallet ownership, transaction evidence, and storage metadata, then explain discrepancies clearly.
-
-MCP complements deterministic verification. It does not replace hash checks or proof reads.
+Use Etherscan V2 server-side for EVM wallet and transaction enrichment when `ETHERSCAN_API_KEY` is
+configured. EVM enrichment is additional evidence inside the BlackBox trace. It does not replace Sui
+proof reads, Walrus hash checks, or deterministic verification.
 
 ## Primary User Flow
 
@@ -365,7 +364,7 @@ Does not include:
 - Live direct Walrus read
 - Live Sui contract
 - Wallet signing or onchain wallet transactions
-- Live MCP calls
+- Live EVM provider calls
 
 ### Phase 2A: Legacy Walrus Direct HTTP Integration
 
@@ -465,13 +464,12 @@ Implemented:
 - Settings includes an asynchronous readiness panel for runtime key presence, Tatum RPC reachability,
   Walrus relay/aggregator configuration, proof package configuration, and latest session status.
 
-### Phase 4: MCP and Submission Polish
+### Phase 4: Submission Polish
 
-Purpose: finish the judge experience and optional AI-assisted verifier.
+Purpose: finish the judge experience and keep provider routing stable.
 
 Build:
 
-- MCP verifier route and explanation
 - Better error states
 - Strong judge-ready data
 - Final README refinement
@@ -504,7 +502,9 @@ Tatum checks, owner and session-ID comparison during full verification, mismatch
 recheck controls. The Agent BlackBox Move proof package is now published on Sui Mainnet at
 `0xbaaa56797e543f20b44fd255f7ca051cb5d4e185b59179a20514159cc8a1914f` with module
 `agent_blackbox` and entry function `create_session_proof`; publish transaction
-`79reMq9AMzvGo9WCeCNKePhiGYJfXXe75rZ2yqKqr8sp`. No server-side private key exists.
+`79reMq9AMzvGo9WCeCNKePhiGYJfXXe75rZ2yqKqr8sp`. EVM wallet and transaction enrichment now routes
+through Etherscan V2 when `ETHERSCAN_API_KEY` is configured; no local tool-server runtime is part of
+the active provider path. No server-side private key exists.
 The repository
 includes the primary UI routes, typed models, local deterministic trace generation, a JSON-backed
 server-side development session service, neutral storage-adapter boundaries, local trace-bundle
@@ -548,7 +548,6 @@ section when a later phase is completed.
 - `POST /api/sessions/[id]/storage-finalize`
 - `POST /api/sessions/[id]/proof-anchor`
 - `GET /api/verify/[id]`
-- `POST /api/mcp/verify`
 
 ## Non-Goals
 

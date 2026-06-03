@@ -28,8 +28,8 @@ Use Agent -> Generate BlackBox Trace -> Store on Walrus Mainnet -> Anchor on Sui
   references, upload references, timestamp, and status.
 - **Tatum Sui RPC** verifies proof objects, transactions, and events through server-side read-only
   routes. `TATUM_API_KEY` stays server-side.
-- **Tatum MCP** is optional and opt-in for EVM/multichain Onchain Analyzer enrichment. Sui analysis
-  uses the official public Sui JSON-RPC endpoint only.
+- **Etherscan V2** enriches EVM wallet and transaction reports when `ETHERSCAN_API_KEY` is configured.
+  Sui analysis uses the official public Sui JSON-RPC endpoint only.
 
 Walrus blobs are public by default. Production deployments should encrypt sensitive trace bundles
 before upload and use durable authenticated session storage.
@@ -62,13 +62,14 @@ network, and timestamp. The server never signs transactions or holds wallet priv
 - Walrus Mainnet stores sealed trace bundles as replayable evidence.
 - Walrus aggregator readback verifies that stored blob content matches the sealed trace hash.
 - Tatum Sui RPC verifies Sui Mainnet proof objects, transactions, and events server-side.
-- Optional Tatum MCP enriches EVM/multichain Onchain Analyzer reports only when explicitly enabled.
+- Etherscan V2 enriches EVM wallet and transaction reports where configured.
 
 **Technical Quality**
 
 - Typed Next.js app with server/client boundaries and server-only secrets.
 - Safe JSON request parsing, structured API errors, rate-limited API guard, bounded provider reads, and provider timeouts.
-- Sui analysis uses official public Sui JSON-RPC; EVM analysis routes only to optional Tatum MCP.
+- Sui analysis uses official public Sui JSON-RPC; EVM analysis routes to Etherscan V2.
+- The active app avoids unstable local tool-server runtime dependencies.
 - Build and typecheck are part of the validation flow.
 
 **Creativity**
@@ -121,11 +122,8 @@ OPENAI_API_KEY=<YOUR_AGENT_RUNTIME_KEY>
 TATUM_API_KEY=<YOUR_TATUM_API_KEY>
 TATUM_SUI_RPC_URL=https://sui-mainnet.gateway.tatum.io
 
-# Set to true only when EVM/multichain analysis should use Tatum MCP.
-TATUM_MCP_ENABLED=false
-TATUM_MCP_COMMAND=npx
-TATUM_MCP_PACKAGE=@tatumio/blockchain-mcp
-TATUM_MCP_SERVER_NAME=tatumio
+ETHERSCAN_API_KEY=<YOUR_ETHERSCAN_V2_API_KEY>
+ETHERSCAN_V2_BASE_URL=https://api.etherscan.io/v2/api
 
 STORAGE_PROVIDER=walrus_sdk_relay
 WALRUS_NETWORK=mainnet
@@ -177,14 +175,14 @@ npm run build
 - Sui proof signing happens in the connected browser wallet; the server never signs transactions.
 - Tatum Sui RPC routes are read-only and allowlisted.
 - The local JSON session store is for controlled evaluation and is ignored by Git.
-- EVM reports do not fall back to Etherscan, Moralis, Alchemy, Covalent, or Chainbase.
+- EVM reports use Etherscan V2 when configured and do not fall back to Moralis, Alchemy, Covalent, or Chainbase.
 
 ## Known Demo Limitations
 
 - Local JSON session storage is suitable for controlled judging and local operation, not serverless production persistence.
 - Mainnet storage and proof anchoring require real wallet approvals and sufficient SUI/WAL balance.
 - Sensitive production traces should be encrypted before public decentralized storage upload.
-- Optional Tatum MCP must be enabled explicitly before EVM/multichain enrichment runs.
+- EVM enrichment requires a server-side Etherscan V2 API key.
 
 ## References
 

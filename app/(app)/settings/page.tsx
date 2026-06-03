@@ -4,8 +4,8 @@ import { ReadinessPanel } from "@/components/blackbox/ReadinessPanel";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ProtocolLogo, type Protocol } from "@/components/ui/ProtocolLogo";
 import { formatStatusLabel, StatusBadge } from "@/components/ui/StatusBadge";
-import { getTatumMcpStatus } from "@/lib/mcp/tatum-mcp";
 import { getNetworkConfig } from "@/lib/network-config";
+import { getEtherscanV2Status } from "@/lib/onchain/providers/etherscan-v2";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
 import { getTatumSuiRpcConfig } from "@/lib/tatum-rpc";
 import { getWalrusConfiguration, getWalrusNetworkLabel } from "@/lib/walrus";
@@ -22,24 +22,18 @@ function formatStorageMethod(provider?: string) {
   return "Configured storage adapter";
 }
 
-function formatTatumMcpStatus(status: Awaited<ReturnType<typeof getTatumMcpStatus>>["status"]) {
-  if (status === "configured") return "Configured";
-  if (status === "missing_api_key") return "Missing API Key";
-  if (status === "package_unavailable" || status === "runtime_unavailable") return "Runtime Unavailable";
-  return "Disabled";
-}
-
 const SETTINGS_BADGE_LABELS = new Set([
   "Agent Runtime",
   "Storage Method",
   "Sui network",
   "Sui Proof Contract",
   "Tatum API key present",
-  "Tatum MCP Tools",
   "Tatum Sui RPC",
   "Tatum Sui RPC network",
   "Tatum Sui RPC network match",
   "Walrus network",
+  "Etherscan V2 Provider",
+  "Etherscan API key present",
 ]);
 
 function shouldRenderSettingsBadge(label: string, value: string) {
@@ -52,7 +46,7 @@ export default async function SettingsPage() {
   const walrus = getWalrusConfiguration();
   const proofRegistry = getSuiProofRegistryConfig();
   const tatumRpc = getTatumSuiRpcConfig();
-  const tatumMcp = await getTatumMcpStatus();
+  const etherscan = getEtherscanV2Status();
   const rows = [
     { label: "Agent Runtime", value: env.OPENAI_API_KEY ? "Configured" : "Not Configured" },
     { label: "Tatum Sui RPC", value: tatumRpc.configured ? "Configured" : "Not Configured", protocol: "tatum" as Protocol },
@@ -60,7 +54,9 @@ export default async function SettingsPage() {
     { label: "Tatum Sui RPC URL host", value: tatumRpc.rpcHost, protocol: "tatum" as Protocol },
     { label: "Tatum Sui RPC network match", value: tatumRpc.rpcNetworkMismatch ? "Mismatch" : "Matched", protocol: "tatum" as Protocol },
     { label: "Tatum API key present", value: tatumRpc.apiKeyConfigured ? "Yes" : "No", protocol: "tatum" as Protocol },
-    { label: "Tatum MCP Tools", value: formatTatumMcpStatus(tatumMcp.status), protocol: "tatum" as Protocol },
+    { label: "Etherscan V2 Provider", value: etherscan.configured ? "Configured" : "Missing API Key" },
+    { label: "Etherscan API key present", value: etherscan.apiKeyPresent ? "Yes" : "No" },
+    { label: "Etherscan V2 API host", value: etherscan.baseUrlHost },
     { label: "Storage Method", value: formatStorageMethod(walrus.provider), protocol: "walrus" as Protocol },
     { label: "Sui network", value: network.displayNetwork, protocol: "sui" as Protocol },
     { label: "Sui Proof Contract", value: proofRegistry.configured ? "Configured" : "Not Configured", protocol: "sui" as Protocol },

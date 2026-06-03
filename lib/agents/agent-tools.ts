@@ -19,7 +19,7 @@ import type {
 } from "@/lib/agents/types";
 import { createHashFromString, createResultHash, stableStringify } from "@/lib/hash";
 import { analyzeOnchainInput } from "@/lib/onchain/analyzer-router";
-import type { MultichainOnchainReport, OnchainMcpToolEvidence } from "@/lib/onchain/types";
+import type { MultichainOnchainReport, OnchainProviderEvidence } from "@/lib/onchain/types";
 import { getSuiObject, getTransactionBlock } from "@/lib/tatum-rpc";
 
 function summarizeFiles(input: AgentRuntimeInput) {
@@ -123,7 +123,7 @@ function summarizeOnchainReport(report: MultichainOnchainReport) {
     .map((source) => `${source.name}: ${source.status}`)
     .join("; ");
   const providerDisplay = report.header.dataSourcesUsed.join(", ")
-    || (report.detected.family === "evm" ? "Tatum MCP unavailable" : "none");
+    || (report.detected.family === "evm" ? "Etherscan V2 attempted" : "none");
   const preliminaryNote =
     report.detected.family === "evm" && report.header.enrichmentStatus === "preliminary"
       ? `Live ${report.header.detectedChain} wallet enrichment could not be completed, so no activity claim is made.`
@@ -137,21 +137,21 @@ function summarizeOnchainReport(report: MultichainOnchainReport) {
   ].join(" ");
 }
 
-function summarizeMcpToolInput(call: OnchainMcpToolEvidence) {
+function summarizeProviderEvidenceInput(call: OnchainProviderEvidence) {
   return [
     call.network ? `Network: ${call.network}` : "",
     call.target ? `Target: ${call.target}` : "",
-  ].filter(Boolean).join("; ") || "Tatum MCP tool input.";
+  ].filter(Boolean).join("; ") || "Etherscan V2 provider input.";
 }
 
-function createMcpToolObservation(call: OnchainMcpToolEvidence) {
+function createProviderEvidenceObservation(call: OnchainProviderEvidence) {
   return createObservation(
-    `Tatum MCP: ${call.toolName}`,
-    "Records a Tatum MCP blockchain tool call used for EVM and multichain enrichment.",
-    summarizeMcpToolInput(call),
+    `Etherscan V2: ${call.actionName}`,
+    "Records an Etherscan V2 provider call used for EVM enrichment.",
+    summarizeProviderEvidenceInput(call),
     [
-      "Tool: Tatum MCP",
-      `Action: ${call.toolName}`,
+      "Provider: Etherscan V2",
+      `Action: ${call.actionName}`,
       call.network ? `Network: ${call.network}` : "",
       call.target ? `Target: ${call.target}` : "",
       `Status: ${call.status}`,
@@ -161,8 +161,8 @@ function createMcpToolObservation(call: OnchainMcpToolEvidence) {
     call.status,
     {
       provider: call.provider,
-      package: call.packageName,
-      toolName: call.toolName,
+      actionName: call.actionName,
+      chainId: call.chainId,
       network: call.network,
       target: call.target,
       status: call.status,
@@ -366,9 +366,9 @@ export async function collectPreModelToolObservations(input: AgentRuntimeInput) 
     const targetObservation = await analyzeOnchainTarget(input);
     observations.push(targetObservation);
     const onchainReport = targetObservation.raw as MultichainOnchainReport | undefined;
-    onchainReport?.mcpToolCalls
+    onchainReport?.providerEvidence
       ?.filter((call) => call.status === "completed")
-      .forEach((call) => observations.push(createMcpToolObservation(call)));
+      .forEach((call) => observations.push(createProviderEvidenceObservation(call)));
     observations.push(prepareWalrusTrace(input));
     return observations;
   }

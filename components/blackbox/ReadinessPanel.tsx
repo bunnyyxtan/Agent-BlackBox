@@ -18,9 +18,11 @@ interface ReadinessPayload {
     tatumRpcReachable: boolean;
     tatumRpcCheckedAt: string;
     tatumRpcMessage: string;
-    tatumMcpStatus: "disabled" | "configured" | "missing_api_key" | "package_unavailable" | "runtime_unavailable";
-    tatumMcpMessage: string;
-    tatumMcpApiKeyPresent: boolean;
+    etherscanConfigured: boolean;
+    etherscanStatus: string;
+    etherscanApiKeyPresent: boolean;
+    etherscanHost: string;
+    etherscanMessage: string;
     walrusRelayConfigured: boolean;
     walrusRelayReachable: boolean;
     walrusRelayTipRequirement: "send_tip" | "no_tip" | "unknown";
@@ -48,15 +50,6 @@ function formatWalrusRelayTip(data: ReadinessPayload["data"]) {
   if (data.walrusRelayTipRequirement === "send_tip") return "Available";
   if (data.walrusRelayTipRequirement === "no_tip") return "Not required";
   return "Unavailable";
-}
-
-function formatTatumMcpStatus(data: ReadinessPayload["data"]) {
-  if (!data) return "Checking...";
-  if (data.tatumMcpStatus === "configured") return "Configured";
-  if (data.tatumMcpStatus === "missing_api_key") return "Missing API Key";
-  if (data.tatumMcpStatus === "package_unavailable") return "Package Unavailable";
-  if (data.tatumMcpStatus === "runtime_unavailable") return "Runtime Unavailable";
-  return "Disabled";
 }
 
 function shouldRenderReadinessBadge(value: string) {
@@ -94,8 +87,9 @@ export function ReadinessPanel() {
         { label: "Tatum Sui RPC host", value: data.tatumRpcHost, protocol: "tatum" as Protocol },
         { label: "Tatum Sui RPC API key", value: yesNo(data.tatumKeyPresent), protocol: "tatum" as Protocol },
         { label: "Tatum Sui RPC last check", value: data.tatumRpcCheckedAt, protocol: "tatum" as Protocol },
-        { label: "Tatum MCP Tools", value: formatTatumMcpStatus(data), protocol: "tatum" as Protocol },
-        { label: "Tatum MCP API key present", value: yesNo(data.tatumMcpApiKeyPresent), protocol: "tatum" as Protocol },
+        { label: "Etherscan V2 Provider", value: data.etherscanStatus },
+        { label: "Etherscan API key present", value: yesNo(data.etherscanApiKeyPresent) },
+        { label: "Etherscan V2 host", value: data.etherscanHost },
         { label: "Walrus Upload Relay", value: formatWalrusRelayStatus(data), protocol: "walrus" as Protocol },
         { label: "Walrus relay tip", value: formatWalrusRelayTip(data), protocol: "walrus" as Protocol },
         { label: "Walrus Aggregator", value: data.walrusAggregatorConfigured ? "Configured" : "Not Configured", protocol: "walrus" as Protocol },
@@ -107,7 +101,7 @@ export function ReadinessPanel() {
       ]
     : [
         { label: "Tatum Sui RPC status", value: error ? "Unavailable" : "Checking...", protocol: "tatum" as Protocol },
-        { label: "Tatum MCP Tools", value: error ? "Unavailable" : "Checking...", protocol: "tatum" as Protocol },
+        { label: "Etherscan V2 Provider", value: error ? "Unavailable" : "Checking..." },
         { label: "Walrus Upload Relay", value: error ? "Unavailable" : "Checking...", protocol: "walrus" as Protocol },
         { label: "Walrus relay tip", value: error ? "Unavailable" : "Checking...", protocol: "walrus" as Protocol },
       ];
@@ -151,7 +145,7 @@ export function ReadinessPanel() {
           <div className="px-5 py-3">
             <p className="flex items-start gap-2 text-xs leading-5 text-slate-500">
               <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-300" />
-              {data ? `${data.tatumRpcMessage} ${data.tatumMcpMessage}` : "Readiness checks are running..."}
+              {data ? `${data.tatumRpcMessage} ${data.etherscanMessage}` : "Readiness checks are running..."}
             </p>
           </div>
         </div>

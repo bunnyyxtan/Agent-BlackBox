@@ -9,7 +9,7 @@ Date updated: June 3, 2026
 - Walrus is the canonical decentralized blob-storage layer.
 - Sui anchors lightweight proof metadata.
 - Tatum Sui RPC reads and verifies proof objects, transactions, and events server-side.
-- Tatum MCP is optional and opt-in for EVM/multichain analyzer enrichment.
+- Etherscan V2 enriches EVM wallet and transaction reports when configured.
 
 ## Storage Adapters
 
