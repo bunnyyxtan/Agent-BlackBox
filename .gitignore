@@ -1,0 +1,17 @@
+node_modules
+.next
+.env
+.env.local
+.env.*.local
+.env.production
+.vercel
+dist
+build
+tsconfig.tsbuildinfo
+
+generated-page.html
+out.html
+replace.js
+
+move/**/build/
+.data/

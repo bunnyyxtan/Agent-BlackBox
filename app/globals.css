@@ -1,0 +1,226 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Root variables ──────────────────────────────────── */
+:root {
+  color-scheme: dark;
+  --mouse-x: 50vw;
+  --mouse-y: 50vh;
+}
+
+/* ── Base reset ──────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  min-height: 100%;
+  background: #050507;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* ── Selection ───────────────────────────────────────── */
+::selection {
+  background: rgba(120, 120, 255, 0.25);
+}
+
+/* ── Custom scrollbar ────────────────────────────────── */
+body::-webkit-scrollbar {
+  width: 8px;
+}
+body::-webkit-scrollbar-track {
+  background: #050507;
+}
+body::-webkit-scrollbar-thumb {
+  background: #1c1c24;
+  border-radius: 4px;
+}
+
+/* ── Ambient background glow (fixed behind everything) ─ */
+body::before {
+  content: "";
+  position: fixed;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 800px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
+}
+
+/* ─────────────────────────────────────────────────────
+   Utility classes from the HTML design system
+   ───────────────────────────────────────────────────── */
+
+/* Scroll-reveal: starts hidden, add `.in` via IntersectionObserver */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition:
+    opacity 1s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Gradient text (white → lavender → indigo) */
+.gradient-text {
+  background: linear-gradient(135deg, #fff 0%, #a5a5d4 60%, #6366f1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Indigo box-shadow glow */
+.glow {
+  box-shadow: 0 0 80px -20px rgba(99, 102, 241, 0.4);
+}
+
+/* Dot-grain pattern */
+.grain {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(255, 255, 255, 0.06) 1px,
+    transparent 0
+  );
+  background-size: 32px 32px;
+}
+
+/* Floating bob animation */
+.floating {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Pulse-ring for status dots */
+.ring {
+  animation: pulse-ring 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Card hover lift */
+.card-hover {
+  transition:
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.5s,
+    background 0.5s;
+}
+.card-hover:hover {
+  transform: translateY(-6px);
+}
+
+/* Font shorthand helpers */
+.mono {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+.serif {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+}
+
+/* Flow-line SVG animation */
+.flow-line {
+  stroke-dasharray: 6 6;
+  animation: flow 1s linear infinite;
+}
+
+@keyframes consoleBorder {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes consoleScan {
+  0%,
+  100% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  35%,
+  65% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(260%);
+  }
+}
+
+@keyframes consolePulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.24);
+  }
+}
+
+/* ─────────────────────────────────────────────────────
+   Component layer — reusable project classes
+   ───────────────────────────────────────────────────── */
+@layer components {
+  .page-container {
+    @apply mx-auto w-full max-w-7xl px-6 lg:px-10;
+  }
+
+  /* Mono uppercase indigo eyebrow */
+  .eyebrow {
+    @apply font-mono text-xs tracking-widest uppercase text-indigo-400;
+  }
+
+  .section-title {
+    @apply text-4xl sm:text-5xl font-light tracking-tight text-white leading-tight;
+  }
+
+  .muted {
+    @apply text-sm leading-6 text-zinc-500 font-light;
+  }
+
+  /* Primary CTA — white pill */
+  .button-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-medium text-zinc-900 transition-all hover:shadow-[0_0_40px_-5px_rgba(255,255,255,0.6)];
+  }
+
+  /* Secondary CTA — border pill */
+  .button-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-transparent px-7 py-3.5 text-sm font-light text-zinc-300 transition-all hover:border-white/20 hover:bg-white/[0.03];
+  }
+
+  /* Form fields */
+  .field {
+    @apply w-full rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3.5 text-sm font-light text-white outline-none transition placeholder:text-zinc-600 focus:border-indigo-500/50 focus:bg-white/[0.04];
+  }
+  
+  select.field {
+    @apply appearance-none pr-10;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1em;
+  }
+
+  option {
+    @apply bg-[#050507] text-white;
+  }
+}
