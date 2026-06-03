@@ -178,7 +178,9 @@ export default async function DeveloperPage() {
                 <h2 className="mt-1 text-base font-semibold text-white">Proof-read readiness</h2>
               </div>
             </div>
-            <StatusBadge status={getTatumRpcStatus(tatumRpc, tatumRpcReachability)} />
+            <div className="flex shrink-0 justify-start sm:justify-end">
+              <StatusBadge status={getTatumRpcStatus(tatumRpc, tatumRpcReachability)} />
+            </div>
           </div>
           <dl className="mt-4 space-y-3 text-xs">
             {tatumRpcRows.map(([label, value]) => (
@@ -199,7 +201,9 @@ export default async function DeveloperPage() {
                 <h2 className="mt-1 text-base font-semibold text-white">Blob-read readiness</h2>
               </div>
             </div>
-            <StatusBadge status={walrus.relayConfigured && walrus.aggregatorUrl ? "Configured" : "Not Configured"} />
+            <div className="flex shrink-0 justify-start sm:justify-end">
+              <StatusBadge status={walrus.relayConfigured && walrus.aggregatorUrl ? "Configured" : "Not Configured"} />
+            </div>
           </div>
           <dl className="mt-4 space-y-3 text-xs">
             {walrusRows.map(([label, value]) => (

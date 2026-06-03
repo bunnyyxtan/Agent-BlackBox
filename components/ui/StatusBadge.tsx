@@ -262,7 +262,7 @@ export function StatusBadge({
 
   return (
     <span
-      className={`inline-flex max-w-full min-w-0 items-center whitespace-nowrap rounded-full border font-semibold uppercase tracking-[0.12em] ${sizeClasses[size]} ${variantStyles[resolvedVariant]}`}
+      className={`inline-flex w-fit max-w-full min-w-0 flex-none shrink-0 justify-self-start self-start items-center whitespace-nowrap rounded-full border font-semibold uppercase tracking-[0.12em] ${sizeClasses[size]} ${variantStyles[resolvedVariant]}`}
       title={displayLabel}
     >
       <iconify-icon icon={iconName} className="shrink-0 text-[1.05em]" />

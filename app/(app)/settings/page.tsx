@@ -101,11 +101,11 @@ export default async function SettingsPage() {
                 {label}
               </span>
               {shouldRenderSettingsBadge(label, value) ? (
-                <div>
+                <div className="flex min-w-0 justify-start sm:justify-end">
                   <StatusBadge status={value} />
                 </div>
               ) : (
-                <span className="break-all font-mono text-xs text-slate-300">{value}</span>
+                <span className="min-w-0 break-all font-mono text-xs text-slate-300 sm:text-right">{value}</span>
               )}
             </div>
           ))}

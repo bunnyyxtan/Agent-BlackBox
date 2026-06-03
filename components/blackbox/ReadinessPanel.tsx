@@ -126,7 +126,9 @@ export function ReadinessPanel() {
             </p>
           </div>
         </div>
-        <StatusBadge status={data ? "Ready" : error ? "Failed" : "Pending"} />
+        <div className="flex shrink-0 justify-start sm:justify-end">
+          <StatusBadge status={data ? "Ready" : error ? "Failed" : "Pending"} />
+        </div>
       </div>
 
       {data || !error ? (
@@ -138,9 +140,11 @@ export function ReadinessPanel() {
                 {label}
               </span>
               {shouldRenderReadinessBadge(value) ? (
-                <StatusBadge status={value} />
+                <div className="flex min-w-0 justify-start sm:justify-end">
+                  <StatusBadge status={value} />
+                </div>
               ) : (
-                <span className="break-all font-mono text-xs text-slate-300">{value}</span>
+                <span className="min-w-0 break-all font-mono text-xs text-slate-300 sm:text-right">{value}</span>
               )}
             </div>
           ))}
