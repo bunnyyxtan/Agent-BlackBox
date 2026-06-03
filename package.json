@@ -6,8 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "lint": "tsc --noEmit --incremental false",
+    "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {
     "@mysten/dapp-kit-core": "^1.3.2",

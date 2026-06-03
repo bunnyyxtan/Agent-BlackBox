@@ -46,6 +46,7 @@ const SUPPORTED_AGENT_MODES = new Set<AgentMode>([
   "delivery_proof",
 ]);
 const SUPPORTED_STORAGE_MODES = new Set<StorageMode>(["deletable", "permanent"]);
+const RETIRED_SEED_SESSION_IDS = new Set(["abx-research-market"]);
 
 interface SessionStoreFile {
   version: 1;
@@ -230,8 +231,8 @@ async function initializeStore() {
 
 async function ensureSeedSessionCoverage(sessions: AgentSession[]) {
   const network = getNetworkConfig().network;
-  const nextSessions = [...sessions];
-  let changed = false;
+  const nextSessions = sessions.filter((session) => !RETIRED_SEED_SESSION_IDS.has(session.id));
+  let changed = nextSessions.length !== sessions.length;
 
   for (const input of seedSessionInputs) {
     if (!input.id) continue;
