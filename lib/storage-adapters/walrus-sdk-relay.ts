@@ -50,7 +50,20 @@ function isJsonContentType(contentType: string) {
 }
 
 function responseSnippet(value: string) {
-  return value.replace(/\s+/g, " ").trim().slice(0, 180);
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (/<(?:!doctype|html|head|body|script)\b/i.test(normalized)) {
+    return "HTML response omitted.";
+  }
+  return normalized.replace(/<[^>]+>/g, "").slice(0, 180);
+}
+
+function safeUrlHost(value: string | undefined) {
+  if (!value) return undefined;
+  try {
+    return new URL(value).host;
+  } catch {
+    return undefined;
+  }
 }
 
 export function prepareTraceBundle(traceBundle: TraceBundle) {
@@ -66,12 +79,14 @@ export function prepareTraceBundle(traceBundle: TraceBundle) {
 export async function getUploadRelayTipConfig() {
   const { network, relayUrl } = getWalrusConfiguration();
   const checkedAt = new Date().toISOString();
+  const relayHost = safeUrlHost(relayUrl);
   if (!relayUrl) {
     return {
       configured: false,
       reachable: false,
       network,
       relayUrl,
+      relayHost,
       tipRequirement: "unknown" as const,
       tipConfig: null,
       checkedAt,
@@ -93,6 +108,7 @@ export async function getUploadRelayTipConfig() {
           reachable: false,
           network,
           relayUrl,
+          relayHost,
           tipRequirement: "unknown" as const,
           tipConfig: null,
           checkedAt,
@@ -108,6 +124,7 @@ export async function getUploadRelayTipConfig() {
         reachable: false,
         network,
         relayUrl,
+        relayHost,
         tipRequirement: "unknown" as const,
         tipConfig: null,
         checkedAt,
@@ -125,6 +142,7 @@ export async function getUploadRelayTipConfig() {
         reachable: false,
         network,
         relayUrl,
+        relayHost,
         tipRequirement: "unknown" as const,
         tipConfig,
         checkedAt,
@@ -140,6 +158,7 @@ export async function getUploadRelayTipConfig() {
       reachable: true,
       network,
       relayUrl,
+      relayHost,
       tipRequirement: parseTipRequirement(tipConfig),
       tipConfig,
       checkedAt,
@@ -150,6 +169,7 @@ export async function getUploadRelayTipConfig() {
       reachable: false,
       network,
       relayUrl,
+      relayHost,
       tipRequirement: "unknown" as const,
       tipConfig: null,
       checkedAt,

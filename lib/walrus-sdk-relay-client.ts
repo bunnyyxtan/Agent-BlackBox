@@ -6,13 +6,27 @@ import { encodeTraceBundle } from "@/lib/trace-bundle";
 import type { TraceBundle } from "@/lib/storage-adapters/types";
 import type { StorageMode, StorageReference } from "@/types/blackbox";
 
-type UploadProgressStep =
+export type UploadProgressStep =
   | "preparing"
   | "opening_wallet"
   | "uploading"
   | "certifying"
   | "reading_back"
   | "saving";
+
+export interface WalrusSdkRelayFailureDetails {
+  phase: string;
+  routePath?: string;
+  relayHost?: string;
+  walletApprovalRequested?: boolean;
+  walletApprovalStage?: "none" | "registration" | "certification";
+  uploadJobIdReturned?: boolean;
+  blobIdReturned?: boolean;
+  storageEpochsValid?: boolean;
+  relayUrlConfigured?: boolean;
+  aggregatorUrlConfigured?: boolean;
+  recommendation?: string;
+}
 
 interface WalletTransactionResult {
   $kind?: string;
@@ -52,6 +66,7 @@ export class WalrusSdkRelayClientError extends Error {
     public readonly statusCode?: number,
     public readonly contentType?: string,
     public readonly responseSnippet?: string,
+    public readonly details: WalrusSdkRelayFailureDetails = { phase: "unknown" },
   ) {
     super(message);
   }
@@ -64,7 +79,20 @@ const SUI_GRPC_URLS = {
 
 function safeSnippet(value: unknown) {
   if (typeof value !== "string") return undefined;
-  return value.replace(/\s+/g, " ").trim().slice(0, 240) || undefined;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return undefined;
+  if (/<(?:!doctype|html|head|body|script)\b/i.test(normalized)) {
+    return "HTML response omitted.";
+  }
+  return normalized.replace(/<[^>]+>/g, "").slice(0, 240) || undefined;
+}
+
+function safeUrlHost(value: string) {
+  try {
+    return new URL(value).host;
+  } catch {
+    return undefined;
+  }
 }
 
 function getRecord(value: unknown) {
@@ -115,6 +143,7 @@ function safeErrorMessage(error: unknown) {
 async function runWalrusStep<T>(
   actionName: string,
   code: string,
+  details: WalrusSdkRelayFailureDetails,
   operation: () => Promise<T> | T,
 ): Promise<T> {
   try {
@@ -129,6 +158,7 @@ async function runWalrusStep<T>(
       extractStatusCode(error),
       extractContentType(error),
       extractResponseSnippet(error),
+      details,
     );
   }
 }
@@ -175,25 +205,51 @@ export async function storeTraceBundleWithWallet({
   signAndExecuteTransaction,
   onProgress,
 }: StoreTraceBundleWithWalletOptions): Promise<StorageReference> {
+  const storageEpochsValid = Number.isInteger(storageEpochs) && storageEpochs > 0;
+  const baseFailureDetails = {
+    routePath: "wallet:walrus-sdk-relay",
+    relayHost: safeUrlHost(relayUrl),
+    walletApprovalRequested: false,
+    walletApprovalStage: "none" as const,
+    uploadJobIdReturned: false,
+    blobIdReturned: false,
+    storageEpochsValid,
+    relayUrlConfigured: Boolean(relayUrl),
+    aggregatorUrlConfigured: Boolean(aggregatorUrl),
+    recommendation: "Retry Step 06 or check Walrus upload relay status.",
+  };
+  const stepDetails = (
+    phase: string,
+    overrides: Partial<WalrusSdkRelayFailureDetails> = {},
+  ): WalrusSdkRelayFailureDetails => ({
+    ...baseFailureDetails,
+    phase,
+    ...overrides,
+  });
+
   onProgress?.("preparing", "Preparing trace");
   const blob = await runWalrusStep(
     "Trace bundle encoding",
     "trace_bundle_encoding_failed",
+    stepDetails("trace_encoding"),
     () => encodeTraceBundle(traceBundle),
   );
   const client = await runWalrusStep(
     "Walrus SDK client initialization",
     "walrus_client_init_failed",
+    stepDetails("client_init"),
     () => createRelayClient(network, relayUrl),
   );
   const flow = await runWalrusStep(
     "Walrus write-blob flow creation",
     "walrus_flow_create_failed",
+    stepDetails("flow_create"),
     () => client.walrus.writeBlobFlow({ blob }),
   );
   const encoded = await runWalrusStep(
     "Walrus blob encoding",
     "walrus_blob_encode_failed",
+    stepDetails("blob_encode"),
     () => flow.encode(),
   );
 
@@ -201,6 +257,7 @@ export async function storeTraceBundleWithWallet({
   const registerTransaction = await runWalrusStep(
     "Walrus registration transaction build",
     "walrus_registration_build_failed",
+    stepDetails("register_build"),
     () => flow.register({
       epochs: storageEpochs,
       owner: ownerAddress,
@@ -216,6 +273,10 @@ export async function storeTraceBundleWithWallet({
   const registerDigest = await runWalrusStep(
     "Walrus storage registration wallet transaction",
     "walrus_registration_sign_failed",
+    stepDetails("register_sign", {
+      walletApprovalRequested: true,
+      walletApprovalStage: "registration",
+    }),
     async () => requireTransactionDigest(
       await signAndExecuteTransaction({ transaction: registerTransaction }),
       "Walrus storage registration",
@@ -226,6 +287,10 @@ export async function storeTraceBundleWithWallet({
   const uploaded = await runWalrusStep(
     "Walrus relay upload request",
     "walrus_relay_upload_failed",
+    stepDetails("relay_upload", {
+      walletApprovalRequested: true,
+      walletApprovalStage: "registration",
+    }),
     () => flow.upload({
       digest: registerDigest,
       deletable: storageMode === "deletable",
@@ -236,11 +301,19 @@ export async function storeTraceBundleWithWallet({
   const certifyTransaction = await runWalrusStep(
     "Walrus certification transaction build",
     "walrus_certification_build_failed",
+    stepDetails("certify_build", {
+      walletApprovalRequested: true,
+      walletApprovalStage: "certification",
+    }),
     () => flow.certify(),
   );
   const certifyDigest = await runWalrusStep(
     "Walrus blob certification wallet transaction",
     "walrus_certification_sign_failed",
+    stepDetails("certify_sign", {
+      walletApprovalRequested: true,
+      walletApprovalStage: "certification",
+    }),
     async () => requireTransactionDigest(
       await signAndExecuteTransaction({ transaction: certifyTransaction }),
       "Walrus blob certification",
@@ -249,11 +322,30 @@ export async function storeTraceBundleWithWallet({
   const certified = await runWalrusStep(
     "Walrus certified blob lookup",
     "walrus_blob_lookup_failed",
+    stepDetails("blob_lookup", {
+      walletApprovalRequested: true,
+      walletApprovalStage: "certification",
+    }),
     () => flow.getBlob(),
   ).catch(() => null);
 
   onProgress?.("reading_back", "Reading blob back");
   const blobId = uploaded.blobId || encoded.blobId;
+  if (!blobId) {
+    throw new WalrusSdkRelayClientError(
+      "Walrus relay did not return a valid blob reference.",
+      "walrus_blob_id_missing",
+      "Walrus blob reference extraction",
+      undefined,
+      undefined,
+      undefined,
+      stepDetails("blob_reference", {
+        walletApprovalRequested: true,
+        walletApprovalStage: "certification",
+        blobIdReturned: false,
+      }),
+    );
+  }
   const blobObjectId = uploaded.blobObjectId || certified?.blobObject?.id || "";
   const checkedAt = new Date().toISOString();
   return {

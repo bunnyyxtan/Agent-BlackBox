@@ -27,7 +27,12 @@ import { readJsonResponse } from "@/lib/http/safe-json";
 import { getNetworkConfig, normalizeSuiNetwork } from "@/lib/network-config";
 import { shortenSuiAddress } from "@/lib/sui-client-helpers";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
-import { storeTraceBundleWithWallet } from "@/lib/walrus-sdk-relay-client";
+import {
+  storeTraceBundleWithWallet,
+  WalrusSdkRelayClientError,
+  type UploadProgressStep,
+  type WalrusSdkRelayFailureDetails,
+} from "@/lib/walrus-sdk-relay-client";
 import type { TraceBundle } from "@/lib/storage-adapters/types";
 import type {
   AgentMode,
@@ -139,6 +144,15 @@ function safeTrimmedText(value: unknown, maxLength = 800) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength) || undefined;
 }
 
+function safeResponseSnippet(value: unknown) {
+  const snippet = safeTrimmedText(value, 240);
+  if (!snippet) return undefined;
+  if (/<(?:!doctype|html|head|body|script)\b/i.test(snippet)) {
+    return "HTML response omitted.";
+  }
+  return snippet.replace(/<[^>]+>/g, "").trim() || undefined;
+}
+
 function shortErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "Unknown error.");
   return safeTrimmedText(message) ?? "Unknown error.";
@@ -191,12 +205,41 @@ function errorResponseSnippet(error: unknown) {
   const record = errorRecord(error);
   const response = nestedErrorRecord(error, "response");
   return (
-    safeTrimmedText(record?.responseSnippet, 240) ??
-    safeTrimmedText(record?.snippet, 240) ??
-    safeTrimmedText(record?.body, 240) ??
-    safeTrimmedText(response?.body, 240) ??
-    safeTrimmedText(response?.data, 240)
+    safeResponseSnippet(record?.responseSnippet) ??
+    safeResponseSnippet(record?.snippet) ??
+    safeResponseSnippet(record?.body) ??
+    safeResponseSnippet(response?.body) ??
+    safeResponseSnippet(response?.data)
   );
+}
+
+function safeUrlHost(value: string | undefined) {
+  if (!value) return undefined;
+  try {
+    return new URL(value).host;
+  } catch {
+    return undefined;
+  }
+}
+
+function relayFailureDetails(error: unknown): Partial<WalrusSdkRelayFailureDetails> {
+  if (error instanceof WalrusSdkRelayClientError) return error.details;
+  const details = errorRecord(error)?.details;
+  return typeof details === "object" && details !== null
+    ? details as Partial<WalrusSdkRelayFailureDetails>
+    : {};
+}
+
+function recommendationForWalrusError(code: WalrusUploadErrorCode) {
+  if (code === "wallet_rejected") return "Retry Step 06 and approve both Walrus wallet requests.";
+  if (code === "insufficient_sui") return "Add SUI for Walrus registration/certification gas, then retry Step 06.";
+  if (code === "insufficient_wal") return "Add WAL/SUI storage balance for Walrus Mainnet, then retry Step 06.";
+  if (code === "wrong_network") return "Switch the connected wallet to Sui Mainnet, then retry Step 06.";
+  if (code === "walrus_config_missing" || code === "relay_unavailable") {
+    return "Check Walrus relay configuration/status, then retry Step 06.";
+  }
+  if (code === "blob_id_missing") return "Retry Step 06; the relay did not return a usable blob reference.";
+  return "Retry Step 06 or check Walrus upload relay status.";
 }
 
 function classifyWalrusUploadError(error: unknown): WalrusUploadErrorCode {
@@ -303,8 +346,8 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
     });
   }
 
-  function handleWalletUploadProgress(message: string) {
-    if (/reading blob/i.test(message)) {
+  function handleWalletUploadProgress(step: UploadProgressStep, message: string) {
+    if (step === "reading_back" || /reading blob/i.test(message)) {
       completeStep("uploading");
       activateStep("reading_back");
       return;
@@ -370,10 +413,18 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
   ): WalrusUploadDiagnostics {
     const traceBundle = prepared?.traceBundle;
     const missingConfigKeys = getWalrusMissingConfigKeys(prepared);
+    const storageEpochsValid = Boolean(
+      prepared &&
+        Number.isInteger(prepared.storageConfig.storageEpochs) &&
+        prepared.storageConfig.storageEpochs > 0,
+    );
     return {
       failedStep: "Storing on Walrus Mainnet",
+      stepId: "storage_upload",
+      routePath: "wallet:walrus-sdk-relay",
       actionName: "Walrus SDK Upload Relay",
       endpoint: prepared?.storageConfig.relayUrl || undefined,
+      relayHost: safeUrlHost(prepared?.storageConfig.relayUrl),
       network: `wallet ${normalizeSuiNetwork(walletNetwork)}; app ${configuredNetwork.network}; walrus ${prepared?.storageConfig.network ?? "not prepared"}`,
       expectedNetwork: "Sui Mainnet / Walrus Mainnet",
       storageMode: prepared?.storageConfig.storageMode ?? storageMode,
@@ -386,8 +437,16 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
       traceHashExists: Boolean(traceBundle?.traceHash),
       walrusConfigExists: missingConfigKeys.length === 0,
       missingConfigKeys,
+      relayUrlConfigured: Boolean(prepared?.storageConfig.relayUrl),
+      aggregatorUrlConfigured: Boolean(prepared?.storageConfig.aggregatorUrl),
+      storageEpochsValid,
       balancePreflight: "not checked: balance preflight is not exposed by the current wallet SDK path",
+      walletApprovalRequested: false,
+      walletApprovalStage: "none",
+      uploadJobIdReturned: false,
+      blobIdReturned: false,
       blobIdRecorded: false,
+      recommendation: "Retry Step 06 or check Walrus upload relay status.",
       ...overrides,
     };
   }
@@ -404,6 +463,8 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
       buildWalrusDiagnostics(prepared, {
         errorCode: diagnostics.errorCode ?? code,
         shortMessage: diagnostics.shortMessage ?? message,
+        sanitizedMessage: diagnostics.sanitizedMessage ?? diagnostics.shortMessage ?? message,
+        recommendation: diagnostics.recommendation ?? recommendationForWalrusError(code),
         ...diagnostics,
       }),
     );
@@ -458,6 +519,10 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         "wallet_not_connected",
         "Wallet connection is required to pay for Walrus Mainnet storage.",
         prepared,
+        {
+          routePath: "wallet:preflight",
+          recommendation: "Connect a Sui Mainnet wallet, then retry Step 06.",
+        },
       );
     }
     if (!walletSignerAvailable()) {
@@ -465,6 +530,10 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         "wallet_signer_unavailable",
         "Wallet signer not available.",
         prepared,
+        {
+          routePath: "wallet:preflight",
+          recommendation: "Reconnect the wallet so the signer is available, then retry Step 06.",
+        },
       );
     }
     if (normalizeSuiNetwork(walletNetwork) !== configuredNetwork.network) {
@@ -472,6 +541,10 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         "wrong_network",
         "Switch to Sui Mainnet before storing this trace on Walrus.",
         prepared,
+        {
+          routePath: "wallet:preflight",
+          recommendation: "Switch the connected wallet to Sui Mainnet, then retry Step 06.",
+        },
       );
     }
     if (!prepared.traceBundle) {
@@ -479,7 +552,11 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         "invalid_trace_bundle",
         "The sealed trace bundle is missing.",
         prepared,
-        { traceBundleExists: false },
+        {
+          routePath: "wallet:preflight",
+          traceBundleExists: false,
+          recommendation: "Restart trace capture so the sealed bundle can be rebuilt.",
+        },
       );
     }
     if (!prepared.traceBundle.inputHash || !prepared.traceBundle.resultHash || !prepared.traceBundle.traceHash) {
@@ -487,22 +564,39 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         "invalid_trace_bundle",
         "The sealed trace bundle is missing one or more required hashes.",
         prepared,
+        {
+          routePath: "wallet:preflight",
+          recommendation: "Restart trace capture so input, result, and trace hashes are resealed.",
+        },
       );
     }
-    if (!prepared.storageConfig.storageMode || !Number.isFinite(prepared.storageConfig.storageEpochs) || prepared.storageConfig.storageEpochs < 1) {
+    const storageEpochsValid =
+      Number.isInteger(prepared.storageConfig.storageEpochs) &&
+      prepared.storageConfig.storageEpochs > 0;
+    if (!prepared.storageConfig.storageMode || !storageEpochsValid) {
       throw createWalrusStepError(
         "invalid_storage_policy",
         "Walrus storage duration or storage mode is invalid.",
         prepared,
+        {
+          routePath: "wallet:preflight",
+          storageEpochsValid: false,
+          recommendation: "Choose a positive whole-number storage epoch value, then retry Step 06.",
+        },
       );
     }
     const missingConfigKeys = getWalrusMissingConfigKeys(prepared);
     if (missingConfigKeys.length > 0) {
       throw createWalrusStepError(
         "walrus_config_missing",
-        "Walrus storage config is missing.",
+        "Walrus upload is not ready. Check relay configuration and wallet connection.",
         prepared,
-        { missingConfigKeys, walrusConfigExists: false },
+        {
+          routePath: "wallet:preflight",
+          missingConfigKeys,
+          walrusConfigExists: false,
+          recommendation: "Set the missing Walrus env/config keys, then retry Step 06.",
+        },
       );
     }
     if (configuredNetwork.network === "sui-mainnet" && prepared.storageConfig.network !== "mainnet") {
@@ -510,22 +604,34 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         "wrong_network",
         "Walrus storage is not configured for Mainnet while the app is using Sui Mainnet.",
         prepared,
+        {
+          routePath: "wallet:preflight",
+          recommendation: "Set WALRUS_NETWORK=mainnet for Sui Mainnet sessions.",
+        },
       );
     }
     if (!prepared.storageConfig.relayUrl) {
       throw createWalrusStepError(
         "walrus_config_missing",
-        "Walrus Mainnet upload relay is not configured.",
+        "Walrus upload is not ready. Check relay configuration and wallet connection.",
         prepared,
-        { endpoint: "missing relay URL" },
+        {
+          routePath: "wallet:preflight",
+          relayUrlConfigured: false,
+          recommendation: "Set WALRUS_UPLOAD_RELAY_URL, then retry Step 06.",
+        },
       );
     }
     if (!prepared.storageConfig.aggregatorUrl) {
       throw createWalrusStepError(
         "walrus_config_missing",
-        "Walrus Mainnet aggregator is not configured.",
+        "Walrus upload is not ready. Check relay configuration and wallet connection.",
         prepared,
-        { endpoint: "missing aggregator URL" },
+        {
+          routePath: "wallet:preflight",
+          aggregatorUrlConfigured: false,
+          recommendation: "Set WALRUS_AGGREGATOR_URL, then retry Step 06.",
+        },
       );
     }
     if (prepared.storageConfig.relayStatus && prepared.storageConfig.relayStatus.reachable === false) {
@@ -534,11 +640,14 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         prepared.storageConfig.relayStatus.error ?? "Walrus Mainnet upload relay is unavailable.",
         prepared,
         {
-          endpoint: prepared.storageConfig.relayUrl,
+          routePath: "/api/agent/prepare",
+          relayHost: safeUrlHost(prepared.storageConfig.relayUrl),
           statusCode: prepared.storageConfig.relayStatus.statusCode,
           contentType: prepared.storageConfig.relayStatus.contentType,
           responseSnippet: prepared.storageConfig.relayStatus.responseSnippet,
           errorCode: "relay_unavailable",
+          sanitizedMessage: prepared.storageConfig.relayStatus.error,
+          recommendation: "Check the Walrus upload relay status, then retry Step 06.",
         },
       );
     }
@@ -563,40 +672,60 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
         tipConfig: prepared.storageConfig.relayStatus?.tipConfig,
         signAndExecuteTransaction: ({ transaction }) =>
           dAppKit.signAndExecuteTransaction({ transaction: transaction as never }) as Promise<never>,
-        onProgress: (_, message) => handleWalletUploadProgress(message),
+        onProgress: (step, message) => handleWalletUploadProgress(step, message),
       });
     } catch (uploadError) {
       const code = classifyWalrusUploadError(uploadError);
+      const relayDetails = relayFailureDetails(uploadError);
       throw createWalrusStepError(
         code,
         shortErrorMessage(uploadError) || "Walrus storage request failed.",
         prepared,
         {
           actionName: errorActionName(uploadError) ?? "Walrus SDK Upload Relay",
+          routePath: relayDetails.routePath ?? "wallet:walrus-sdk-relay",
           endpoint: prepared.storageConfig.relayUrl,
+          relayHost: relayDetails.relayHost ?? safeUrlHost(prepared.storageConfig.relayUrl),
           statusCode: errorStatusCode(uploadError),
           contentType: errorContentType(uploadError),
           responseSnippet: errorResponseSnippet(uploadError),
           errorCode: errorCode(uploadError) ?? code,
           shortMessage: shortErrorMessage(uploadError),
+          sanitizedMessage: shortErrorMessage(uploadError),
+          failurePhase: relayDetails.phase,
+          walletApprovalRequested: relayDetails.walletApprovalRequested,
+          walletApprovalStage: relayDetails.walletApprovalStage,
+          uploadJobIdReturned: relayDetails.uploadJobIdReturned,
+          blobIdReturned: relayDetails.blobIdReturned,
+          storageEpochsValid: relayDetails.storageEpochsValid,
+          relayUrlConfigured: relayDetails.relayUrlConfigured,
+          aggregatorUrlConfigured: relayDetails.aggregatorUrlConfigured,
           balancePreflight: getBalancePreflightResult(uploadError),
+          recommendation: relayDetails.recommendation ?? recommendationForWalrusError(code),
           blobIdRecorded: false,
         },
       );
     }
-    if (!storage.blobId) {
+    if (!storage.uploadJobId || !storage.blobId) {
       throw createWalrusStepError(
         "blob_id_missing",
-        "Walrus storage failed before a blob ID was recorded.",
+        !storage.uploadJobId
+          ? "Walrus relay did not return a valid upload job."
+          : "Walrus relay did not return a valid blob reference.",
         prepared,
         {
-          endpoint: prepared.storageConfig.relayUrl,
+          routePath: "wallet:walrus-sdk-relay",
+          relayHost: safeUrlHost(prepared.storageConfig.relayUrl),
           errorCode: "blob_id_missing",
+          failurePhase: !storage.uploadJobId ? "upload_job_reference" : "blob_reference",
+          uploadJobIdReturned: Boolean(storage.uploadJobId),
+          blobIdReturned: Boolean(storage.blobId),
+          recommendation: "Retry Step 06; the relay did not return complete storage references.",
           blobIdRecorded: false,
         },
       );
     }
-    completeStep("reading_back");
+    completeSteps(["uploading", "reading_back"]);
     setArtifacts((current) => ({ ...current, prepared, storage }));
     return storage;
   }

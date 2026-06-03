@@ -23,12 +23,17 @@ export type WalrusUploadErrorCode =
 
 export interface WalrusUploadDiagnostics {
   failedStep: string;
+  stepId?: string;
+  routePath?: string;
   actionName: string;
   endpoint?: string;
+  relayHost?: string;
   network?: string;
   expectedNetwork?: string;
   walletConnected: boolean;
   signerAvailable: boolean;
+  walletApprovalRequested?: boolean;
+  walletApprovalStage?: string;
   storageMode?: string;
   walletAddress?: string | null;
   statusCode?: number;
@@ -36,14 +41,22 @@ export interface WalrusUploadDiagnostics {
   responseSnippet?: string;
   errorCode?: string;
   shortMessage?: string;
+  sanitizedMessage?: string;
+  failurePhase?: string;
   traceBundleExists: boolean;
   inputHashExists: boolean;
   resultHashExists: boolean;
   traceHashExists: boolean;
   walrusConfigExists: boolean;
   missingConfigKeys: string[];
+  relayUrlConfigured?: boolean;
+  aggregatorUrlConfigured?: boolean;
+  storageEpochsValid?: boolean;
   balancePreflight: string;
+  uploadJobIdReturned?: boolean;
+  blobIdReturned?: boolean;
   blobIdRecorded: boolean;
+  recommendation?: string;
 }
 
 export class WalrusUploadError extends Error {
@@ -81,30 +94,49 @@ function yesNo(value: boolean) {
   return value ? "yes" : "no";
 }
 
+function optionalYesNo(value: boolean | undefined) {
+  return typeof value === "boolean" ? yesNo(value) : "not reported";
+}
+
+function normalizeDiagnosticCode(value: string | undefined) {
+  return value ? value.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toUpperCase() : "NOT_REPORTED";
+}
+
 function formatWalrusDiagnostics(diagnostics: WalrusUploadDiagnostics) {
   return [
     `Failed step: ${diagnostics.failedStep}`,
+    `Step ID: ${diagnostics.stepId || "storage_upload"}`,
+    `Route/path: ${diagnostics.routePath || "wallet:walrus-sdk-relay"}`,
     `Endpoint/action: ${diagnostics.actionName}`,
-    diagnostics.endpoint ? `Endpoint URL: ${diagnostics.endpoint}` : "Endpoint URL: not applicable",
+    `Relay host: ${diagnostics.relayHost || "not reported"}`,
     `Network: ${diagnostics.network || "not reported"}`,
     `Expected network: ${diagnostics.expectedNetwork || "not reported"}`,
     `Storage mode: ${diagnostics.storageMode || "not reported"}`,
+    `Storage epochs valid: ${optionalYesNo(diagnostics.storageEpochsValid)}`,
     `Wallet address: ${diagnostics.walletAddress || "not connected"}`,
     `Wallet connected: ${yesNo(diagnostics.walletConnected)}`,
     `Signer available: ${yesNo(diagnostics.signerAvailable)}`,
-    `Status code: ${diagnostics.statusCode ?? "not reported"}`,
+    `Wallet approval requested: ${optionalYesNo(diagnostics.walletApprovalRequested)}`,
+    `Wallet approval stage: ${diagnostics.walletApprovalStage || "not reported"}`,
+    `Failure phase: ${diagnostics.failurePhase || "not reported"}`,
+    `Status: ${diagnostics.statusCode ?? "not reported"}`,
     `Content-Type: ${diagnostics.contentType || "not reported"}`,
-    `Error code: ${diagnostics.errorCode || "not reported"}`,
-    `Short error: ${diagnostics.shortMessage || "not reported"}`,
+    `Code: ${normalizeDiagnosticCode(diagnostics.errorCode)}`,
+    `Message: ${diagnostics.sanitizedMessage || diagnostics.shortMessage || "not reported"}`,
     `Safe response snippet: ${diagnostics.responseSnippet || "not available"}`,
     `Trace bundle exists: ${yesNo(diagnostics.traceBundleExists)}`,
     `Input hash exists: ${yesNo(diagnostics.inputHashExists)}`,
     `Result hash exists: ${yesNo(diagnostics.resultHashExists)}`,
     `Trace hash exists: ${yesNo(diagnostics.traceHashExists)}`,
     `Walrus config exists: ${yesNo(diagnostics.walrusConfigExists)}`,
+    `Relay URL configured: ${optionalYesNo(diagnostics.relayUrlConfigured)}`,
+    `Aggregator URL configured: ${optionalYesNo(diagnostics.aggregatorUrlConfigured)}`,
     `Missing config keys: ${diagnostics.missingConfigKeys.length > 0 ? diagnostics.missingConfigKeys.join(", ") : "none"}`,
     `Balance/preflight result: ${diagnostics.balancePreflight}`,
+    `Upload job ID returned: ${optionalYesNo(diagnostics.uploadJobIdReturned)}`,
+    `Blob/reference returned: ${optionalYesNo(diagnostics.blobIdReturned)}`,
     `Blob ID recorded: ${yesNo(diagnostics.blobIdRecorded)}`,
+    `Recommendation: ${diagnostics.recommendation || "Retry Step 06 or check Walrus upload relay status."}`,
   ].join("\n");
 }
 
@@ -196,8 +228,8 @@ export function normalizeUserFacingError(error: unknown): UserFacingError {
 
     if (error.code === "walrus_config_missing") {
       return {
-        title: "Walrus storage config is missing.",
-        lines: ["Check the upload relay, aggregator, and Walrus SDK settings before retrying."],
+        title: "Walrus upload is not ready.",
+        lines: ["Check relay configuration and wallet connection before retrying."],
         details,
       };
     }
@@ -236,7 +268,7 @@ export function normalizeUserFacingError(error: unknown): UserFacingError {
 
     if (error.code === "wallet_rejected") {
       return {
-        title: "Wallet request cancelled.",
+        title: "Wallet approval was rejected.",
         lines: ["No Walrus storage transaction was completed. You can re-run from this step."],
         details,
       };
@@ -256,15 +288,15 @@ export function normalizeUserFacingError(error: unknown): UserFacingError {
 
     if (error.code === "insufficient_sui") {
       return {
-        title: "Not enough SUI for transaction gas.",
-        lines: ["Not enough SUI/WAL balance to pay for Walrus storage."],
+        title: "Insufficient SUI for Walrus storage gas.",
+        lines: ["Add a small SUI balance for Walrus registration and certification transactions."],
         details,
       };
     }
 
     if (error.code === "blob_id_missing") {
       return {
-        title: "Walrus storage failed before a blob ID was recorded.",
+        title: "Walrus relay did not return a valid upload job.",
         lines: ["The sealed trace bundle is preserved locally and can be re-run from Step 6."],
         details,
       };

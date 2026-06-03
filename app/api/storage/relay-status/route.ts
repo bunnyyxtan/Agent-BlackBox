@@ -11,15 +11,25 @@ export async function GET(request: Request) {
 
   const walrus = getWalrusConfiguration();
   const relayStatus = await getUploadRelayTipConfig();
+  const relayDetails = relayStatus as {
+    relayHost?: string;
+    statusCode?: number;
+    contentType?: string;
+    responseSnippet?: string;
+  };
   const result = {
     configured: walrus.relayConfigured,
     relayReachable: relayStatus.reachable,
     network: walrus.network,
     relayUrl: walrus.relayUrl,
+    relayHost: relayDetails.relayHost,
     aggregatorUrl: walrus.aggregatorUrl,
     tipRequirement: relayStatus.tipRequirement,
     tipConfig: relayStatus.tipConfig,
     checkedAt: relayStatus.checkedAt,
+    statusCode: relayDetails.statusCode,
+    contentType: relayDetails.contentType,
+    responseSnippet: relayDetails.responseSnippet,
     error: relayStatus.error,
   };
   const response: ApiSuccessResponse<typeof result> = {
