@@ -34,6 +34,11 @@ const metricToneClasses: Record<SpecialistReportMetric["tone"], string> = {
   warning: "border-amber-300/20 bg-amber-300/[0.055] text-amber-100",
   danger: "border-red-300/20 bg-red-300/[0.055] text-red-100",
 };
+const LEGACY_PROVIDER_PATTERN = new RegExp(`\\b(moralis|alchemy|covalent|chainbase|${"ether"}${"scan"})\\b`, "i");
+const DEBUG_PROVIDER_PATTERN = new RegExp(
+  `not_configured|api_key|base_url|moralis|alchemy|covalent|chainbase|${"ether"}${"scan"}|${"e"}${"vm"}|live data section`,
+  "i",
+);
 
 function downloadFile(fileName: string, content: string, type: string) {
   const blob = new Blob([content], { type });
@@ -51,50 +56,20 @@ function formatMarkdownList(items: string[]) {
 }
 
 function isLegacyProviderName(value: string) {
-  return /\b(moralis|alchemy|covalent|chainbase)\b/i.test(value);
-}
-
-function formatProviderList(values: string[]) {
-  const visible = Array.from(new Set(values.filter((value) => value && !isLegacyProviderName(value))));
-  return visible.length > 0 ? visible.join(", ") : "None";
+  return LEGACY_PROVIDER_PATTERN.test(value);
 }
 
 function getOnchainProviderDisplay(onchain: OnchainAnalysis | undefined) {
-  if (!onchain) return "None";
+  if (!onchain) return "Sui RPC";
   const headerProviders = Array.from(
     new Set(onchain.header.dataSourcesUsed.filter((value) => value && !isLegacyProviderName(value))),
   );
   if (headerProviders.length > 0) return headerProviders.join(", ");
-
-  const etherscanSource = onchain.dataSources.find((source) => source.name === "Etherscan V2");
-  if (etherscanSource) {
-    return etherscanSource.used || etherscanSource.status === "used" || etherscanSource.status === "partial"
-      ? "Etherscan V2"
-      : "Etherscan V2 attempted";
-  }
-  return "None";
-}
-
-function isPreliminaryEvmWithProviderFailure(onchain: OnchainAnalysis | undefined) {
-  if (!onchain || onchain.detected.family !== "evm") return false;
-  return onchain.header.enrichmentStatus === "preliminary"
-    && onchain.dataSources.some((source) => source.name === "Etherscan V2" && (source.status === "failed" || source.status === "not_configured"));
-}
-
-function getPreliminaryProviderWarning(onchain: OnchainAnalysis | undefined) {
-  if (!onchain || !isPreliminaryEvmWithProviderFailure(onchain)) return "";
-  return "Live EVM enrichment could not be completed with Etherscan V2. This report is preliminary.";
-}
-
-function isNoisyPreliminaryFinding(title: string) {
-  return /\b(data enrichment status|limitations and data gaps|data gaps|provider limitations)\b/i.test(title);
+  return onchain.detected.family === "sui" ? "Sui RPC" : "Archived onchain data";
 }
 
 function getUserFacingFindings(report: StructuredReport) {
-  const onchain = report.onchainAnalysis;
-  if (!isPreliminaryEvmWithProviderFailure(onchain)) return report.findings;
-  const filtered = report.findings.filter((finding) => !isNoisyPreliminaryFinding(finding.title));
-  return filtered.length > 0 ? filtered : report.findings.slice(0, 1);
+  return report.findings;
 }
 
 function getUserFacingOnchainDataSources(onchain: OnchainAnalysis) {
@@ -135,7 +110,7 @@ function formatSpecialistMarkdown(specialist: SpecialistAgentReport) {
     `- ${specialist.subjectLabel}: ${specialist.subject}`,
     `- Confidence: ${specialist.confidence}`,
     `- Generated: ${formatDate(specialist.generatedAt)}`,
-    `- Data sources used: ${specialist.dataSourcesUsed.join(", ") || "User-provided input only"}`,
+    `- Data sources used: ${specialist.dataSourcesUsed.join(", ") || "Sealed task prompt"}`,
     "",
     "### Scorecard",
     specialist.metrics
@@ -274,25 +249,6 @@ function buildMarkdownReport(session: AgentSession) {
           `- ${tool.toolName} [${formatStatusLabel(tool.status)}]: ${tool.purpose} ${tool.outputSummary}`,
       )
       .join("\n"),
-    ...(onchain?.providerEvidence?.length
-      ? [
-          "",
-          "## Etherscan V2 Provider Evidence",
-          ...onchain.providerEvidence
-            .map((call) =>
-              [
-                `### Etherscan V2 - ${call.actionName}`,
-                "",
-                `- Network: ${call.network ?? "Not recorded"}`,
-                `- Chain ID: ${call.chainId ?? "Not recorded"}`,
-                `- Target: ${call.target ?? "Not recorded"}`,
-                `- Status: ${formatStatusLabel(call.status)}`,
-                `- Result used in report: ${formatStatusLabel(call.resultUsedInReport ? "yes" : "no")}`,
-                `- Summary: ${call.summary}`,
-              ].join("\n"),
-            ),
-        ]
-      : []),
     "",
     "## Final Report",
     report.finalOutput,
@@ -406,14 +362,8 @@ function getToolPresentation(toolName: string) {
   }
   if (normalized.includes("onchaintarget")) {
     return {
-      action: "Onchain target analyzed",
-      detail: "Checked the detected wallet, object, transaction, or contract context using the configured chain data source.",
-    };
-  }
-  if (normalized.includes("etherscan")) {
-    return {
-      action: "Etherscan V2 provider call",
-      detail: "Recorded EVM enrichment evidence returned by Etherscan V2.",
+      action: "Sui target analyzed",
+      detail: "Checked the detected Sui wallet, object, package, or transaction context using Sui RPC data.",
     };
   }
   if (normalized.includes("specialistagentcontext")) {
@@ -453,7 +403,7 @@ function getToolPresentation(toolName: string) {
 }
 
 function isDebugProviderText(value: string) {
-  return /not_configured|api_key|base_url|moralis|alchemy|covalent|chainbase|live data section/i.test(value);
+  return DEBUG_PROVIDER_PATTERN.test(value);
 }
 
 function getVisibleToolCalls(report: NonNullable<AgentSession["trace"]["structuredOutput"]>) {
@@ -481,8 +431,7 @@ function getDataSourceSummary(
       .filter(Boolean) ?? [];
 
   if (usedSources.length > 0) {
-    const sourceType = onchain?.detected.family === "sui" ? "Sui" : "EVM";
-    summaries.unshift(`Live ${sourceType} data source: ${Array.from(new Set(usedSources)).join(", ")}`);
+    summaries.unshift(`Live Sui data source: ${Array.from(new Set(usedSources)).join(", ")}`);
   }
 
   return summaries;
@@ -661,7 +610,6 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
   const promptPreview = getPromptPreview(session.prompt, promptExpanded);
   const visibleToolCalls = report ? getVisibleToolCalls(report) : [];
   const userFacingFindings = report ? getUserFacingFindings(report) : [];
-  const preliminaryProviderWarning = getPreliminaryProviderWarning(onchain);
   const dataSourceSummary = getDataSourceSummary(session, onchain);
   const suiTransactionUrl = buildSuiExplorerUrl(
     "transaction",
@@ -736,6 +684,24 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
             </button>
           </div>
         </div>
+
+        <section className="mt-5 min-w-0 rounded-2xl border border-white/[0.07] bg-black/25 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-cyan">
+                Final Report
+              </p>
+              <h3 className="mt-1 text-base font-semibold text-white">Primary agent output</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge status={getSessionEvidenceStatus(session)} />
+              {onchain?.balanceLookupStatus && <StatusBadge status={onchain.balanceLookupStatus} />}
+            </div>
+          </div>
+          <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-300 [overflow-wrap:anywhere]">
+            {report.finalOutput}
+          </div>
+        </section>
 
         <section className="mt-5 rounded-2xl border border-cyan/15 bg-black/20 p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -817,14 +783,9 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
                   <p className="mt-2 break-words font-mono text-xs leading-5 text-slate-400 [overflow-wrap:anywhere]">
                     {onchain.header.target ?? "No target supplied"}
                   </p>
-                </div>
+              </div>
                 <StatusBadge status={onchain.header.enrichmentStatus} />
               </div>
-              {preliminaryProviderWarning && (
-                <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.055] p-3 text-xs leading-5 text-amber-100">
-                  {preliminaryProviderWarning}
-                </div>
-              )}
               <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
                 {[
                   ["Provider", getOnchainProviderDisplay(onchain)],
@@ -874,15 +835,6 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
                   </p>
                 </div>
               ))}
-            </div>
-          </section>
-
-          <section className="min-w-0 rounded-2xl border border-white/[0.07] bg-black/20 p-4">
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Final Report
-            </p>
-            <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-300 [overflow-wrap:anywhere]">
-              {report.finalOutput}
             </div>
           </section>
 

@@ -168,7 +168,7 @@ This should be the strongest judge-facing moment because it makes the product va
 
 ## Hybrid Architecture
 
-The product intentionally combines four distinct technical paths plus EVM enrichment.
+The product intentionally combines five Sui-native technical paths.
 Do not blur these responsibilities together.
 
 ### 1. Canonical Storage and Verification: Walrus Blob Storage
@@ -243,11 +243,12 @@ Use Tatum Sui RPC server-side for:
 - Confirming owner and network.
 - Supporting the verification report.
 
-### 6. EVM Enrichment: Etherscan V2
+### 6. Sui Onchain Analyzer
 
-Use Etherscan V2 server-side for EVM wallet and transaction enrichment when `ETHERSCAN_API_KEY` is
-configured. EVM enrichment is additional evidence inside the BlackBox trace. It does not replace Sui
-proof reads, Walrus hash checks, or deterministic verification.
+Use Sui JSON-RPC for Sui wallet, token, transaction, object, and package analysis. The analyzer should
+read balances, coin metadata, owned objects, transaction blocks, object details, and available effects
+without requiring paid Sui provider keys. It should never fabricate holdings, history, or suspicious
+activity. Non-Sui provider paths are outside the active product scope.
 
 ## Primary User Flow
 
@@ -364,7 +365,7 @@ Does not include:
 - Live direct Walrus read
 - Live Sui contract
 - Wallet signing or onchain wallet transactions
-- Live EVM provider calls
+- Live non-Sui provider calls
 
 ### Phase 2A: Legacy Walrus Direct HTTP Integration
 
@@ -433,19 +434,20 @@ Implemented:
 Implemented:
 
 - Server-only Agent Runtime using `OPENAI_API_KEY`.
-- Strict structured JSON output for Research, Risk Review, Delivery Proof, and Multichain Onchain
+- Strict structured JSON output for Research, Risk Review, Delivery Proof, and Sui Onchain
   Analyzer agents.
 - Traceable internal tool abstractions: `recordInputEvidence`, `generatePlan`, `analyzeOnchainTarget`,
   `analyzeSpecialistAgentContext`, `tatumSuiRpcCheck`, `hashTracePreview`, `prepareWalrusTrace`, and
   `finalizeAgentReport`.
 - Research, Risk Review, and Delivery Proof agents attach deterministic `specialistAnalysis` payloads
-  with scorecards, detected entities, evidence items, structured report sections, limitations, next
-  actions, and proof notes. The report UI and JSON/Markdown/Copy exports render these payloads as
-  professional research briefs, risk reports, and delivery receipts.
-- Multichain Onchain Analyzer detects Sui wallet, transaction, object, package, and network context
-  plus EVM wallet, transaction, contract, and chain context through `lib/onchain/analyzer-router.ts`.
-  Sui/Walrus remains the primary proof path; EVM support is additional enrichment. Missing providers are
-  reported honestly as `not_configured` limitations and no onchain activity is fabricated.
+  with task-specific research briefs, risk matrices, delivery receipts, detected entities, evidence
+  items, structured report sections, limitations, next actions, and proof notes. The report UI and
+  JSON/Markdown/Copy exports render these payloads directly so the final report is useful even when
+  external web search is disabled.
+- Sui Onchain Analyzer detects Sui wallet, transaction, object, package, and network context through
+  `lib/onchain/analyzer-router.ts`. It reads balances, coin metadata, owned objects, transaction
+  blocks, object/package details, effects, events, and balance/object changes where Sui JSON-RPC
+  returns them. It does not route to non-Sui providers and does not fabricate onchain activity.
 - Sui analyzer enrichment uses `SUI_RPC_URL` when present and otherwise defaults server-side to
   `https://fullnode.mainnet.sui.io:443`; no Sui API key is required for the first analyzer version.
   Do not add Sui gRPC, Sui indexer, SuiVision, Suiscan, BlockVision, or paid Sui provider integration
@@ -486,8 +488,9 @@ prepares deterministic trace bundles server-side, uploads them on Walrus Mainnet
 SDK Upload Relay with connected-wallet payment, persists live blob metadata, and only marks storage
 as stored after direct Mainnet aggregator readback and trace-hash recomputation succeed. Phase 2F
 runs the selected agent mode server-side before Walrus upload and stores structured reports plus
-tool-call summaries in the trace. The final polish pass also added strict schema repair retry,
-friendly WAL/SUI balance errors, an asynchronous deployment-readiness panel, explicit proof-package
+tool-call summaries in the trace. The final Sui-scope polish pass improved deterministic specialist
+reports, Sui wallet balance/coin metadata reads, report-first session detail hierarchy, readiness
+copy, strict schema repair retry, friendly WAL/SUI balance errors, explicit proof-package
 configuration status, root/app loading states, and a `/developers` alias that redirects to the
 canonical `/developer` route. The legacy
 Phase 2A HTTP publisher adapter remains available only when explicitly selected. The repository
@@ -502,9 +505,9 @@ Tatum checks, owner and session-ID comparison during full verification, mismatch
 recheck controls. The Agent BlackBox Move proof package is now published on Sui Mainnet at
 `0xbaaa56797e543f20b44fd255f7ca051cb5d4e185b59179a20514159cc8a1914f` with module
 `agent_blackbox` and entry function `create_session_proof`; publish transaction
-`79reMq9AMzvGo9WCeCNKePhiGYJfXXe75rZ2yqKqr8sp`. EVM wallet and transaction enrichment now routes
-through Etherscan V2 when `ETHERSCAN_API_KEY` is configured; no local tool-server runtime is part of
-the active provider path. No server-side private key exists.
+`79reMq9AMzvGo9WCeCNKePhiGYJfXXe75rZ2yqKqr8sp`. The active onchain product is Sui-native: no
+non-Sui provider path or local tool-server runtime is part of the active provider path. No
+server-side private key exists.
 The repository
 includes the primary UI routes, typed models, local deterministic trace generation, a JSON-backed
 server-side development session service, neutral storage-adapter boundaries, local trace-bundle

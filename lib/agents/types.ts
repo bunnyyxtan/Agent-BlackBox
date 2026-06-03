@@ -1,6 +1,6 @@
 import type { AgentMode, InputFile, StorageMode } from "@/types/blackbox";
 import type { SpecialistAgentReport } from "@/lib/agents/specialist-report";
-import type { MultichainOnchainReport } from "@/lib/onchain/types";
+import type { SuiOnchainReport } from "@/lib/onchain/types";
 
 export type AgentFindingSeverity = "info" | "low" | "medium" | "high" | "critical";
 export type AgentConfidence = "low" | "medium" | "high";
@@ -55,7 +55,7 @@ export interface AgentRuntimeOutput {
   limitations: string[];
   recommendedNextActions: string[];
   specialistAnalysis?: SpecialistAgentReport;
-  onchainAnalysis?: MultichainOnchainReport;
+  onchainAnalysis?: SuiOnchainReport;
 }
 
 export interface AgentToolObservation {

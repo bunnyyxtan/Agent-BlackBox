@@ -71,22 +71,22 @@ export const AGENT_MODE_DEFINITIONS: Record<
     ],
   },
   onchain_monitor: {
-    displayName: "Multichain Onchain Analyzer",
-    purpose: "Trace-backed multichain analysis for Sui wallet, transaction, object, package, and EVM wallet, transaction, or contract activity.",
+    displayName: "Sui Onchain Analyzer",
+    purpose: "Trace-backed Sui analysis for Sui wallets, token holdings, transactions, objects, and packages.",
     requiredSections: [
       "target analyzed",
       "detected chain and target type",
-      "detected wallet, object, package, transaction, or contract identifiers",
-      "RPC evidence when available",
+      "detected Sui wallet, object, package, or transaction identifiers",
+      "Sui RPC evidence when available",
       "risk signals and data gaps",
       "limitations",
       "recommended actions",
     ],
     planFocus: [
       "Identify the onchain target and available evidence.",
-      "Detect Sui and EVM identifiers, chain mentions, provider readiness, and ambiguity from the title and prompt.",
-      "Keep Sui and Walrus as the primary Agent BlackBox proof path while adding EVM enrichment when supported.",
-      "Produce a chain-aware target analysis while clearly stating when live chain activity was not read.",
+      "Detect Sui identifiers, Sui network hints, provider readiness, and ambiguity from the title and prompt.",
+      "Use Sui JSON-RPC data for balances, owned objects, transaction blocks, object details, and metadata when available.",
+      "Produce a Sui-native target analysis while clearly stating when live chain activity was not read.",
     ],
   },
 };
@@ -104,8 +104,8 @@ export function buildAgentSystemPrompt(agentMode: AgentMode) {
     "Reports should be professional and useful to a normal user: explain what was reviewed, what was found, what evidence supports it, what remains unknown, and what to do next.",
     "Never fabricate chain data, source data, file contents, signatures, storage success, or proof success.",
     agentMode === "onchain_monitor"
-      ? "For Multichain Onchain Analyzer, use the analyzeOnchainTarget tool observation as the source of truth for detected chain, target type, provider status, assumptions, limitations, and proof metadata. A Sui wallet/address, Sui object/package ID, Sui transaction digest, EVM address, EVM transaction hash, or EVM contract address is useful input. If live provider enrichment is missing, produce a professional preliminary report and do not invent activity. Sui/Walrus remains the primary Agent BlackBox proof story; EVM is additional multichain enrichment."
-      : "For Research, Risk Review, and Delivery Proof agents, use the analyzeSpecialistAgentContext tool observation as the source of truth for detected entities, evidence items, missing-data state, scorecard/proof strength, limitations, and recommended next actions. If no external source/search or file-content retrieval is available, explicitly say the report is based on user-provided inputs and attached metadata only. Missing data should produce a useful preliminary report, not a useless failure.",
+      ? "For Sui Onchain Analyzer, use the analyzeOnchainTarget tool observation as the source of truth for detected Sui target, target type, provider status, token balances, assumptions, limitations, and proof metadata. A Sui wallet address, Sui object/package ID, or Sui transaction digest is useful input. If live provider enrichment is missing, produce a professional preliminary report and do not invent activity."
+      : "For Research, Risk Review, and Delivery Proof agents, use the analyzeSpecialistAgentContext tool observation as the source of truth for detected entities, evidence items, report cards, sections, limitations, and recommended next actions. If external search or file-content retrieval is unavailable, keep the note small and still produce task-specific analysis from the supplied prompt and Agent BlackBox context.",
     "If a needed input is missing, say exactly what is missing and lower confidence appropriately.",
   ].filter(Boolean).join("\n");
 }

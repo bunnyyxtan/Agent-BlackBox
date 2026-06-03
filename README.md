@@ -28,8 +28,8 @@ Use Agent -> Generate BlackBox Trace -> Store on Walrus Mainnet -> Anchor on Sui
   references, upload references, timestamp, and status.
 - **Tatum Sui RPC** verifies proof objects, transactions, and events through server-side read-only
   routes. `TATUM_API_KEY` stays server-side.
-- **Etherscan V2** enriches EVM wallet and transaction reports when `ETHERSCAN_API_KEY` is configured.
-  Sui analysis uses the official public Sui JSON-RPC endpoint only.
+- **Sui Onchain Analyzer** reads Sui wallets, token balances, transactions, objects, and packages
+  through Sui JSON-RPC. The active product scope is Sui + Walrus + Tatum Sui RPC.
 
 Walrus blobs are public by default. Production deployments should encrypt sensitive trace bundles
 before upload and use durable authenticated session storage.
@@ -62,14 +62,13 @@ network, and timestamp. The server never signs transactions or holds wallet priv
 - Walrus Mainnet stores sealed trace bundles as replayable evidence.
 - Walrus aggregator readback verifies that stored blob content matches the sealed trace hash.
 - Tatum Sui RPC verifies Sui Mainnet proof objects, transactions, and events server-side.
-- Etherscan V2 enriches EVM wallet and transaction reports where configured.
+- Sui wallet/token analysis uses Sui JSON-RPC, including balance and coin metadata reads.
 
 **Technical Quality**
 
 - Typed Next.js app with server/client boundaries and server-only secrets.
 - Safe JSON request parsing, structured API errors, rate-limited API guard, bounded provider reads, and provider timeouts.
-- Sui analysis uses official public Sui JSON-RPC; EVM analysis routes to Etherscan V2.
-- The active app avoids unstable local tool-server runtime dependencies.
+- The active app uses a clean Sui-only provider architecture with no unstable local tool-server runtime dependencies.
 - Build and typecheck are part of the validation flow.
 
 **Creativity**
@@ -122,8 +121,9 @@ OPENAI_API_KEY=<YOUR_AGENT_RUNTIME_KEY>
 TATUM_API_KEY=<YOUR_TATUM_API_KEY>
 TATUM_SUI_RPC_URL=https://sui-mainnet.gateway.tatum.io
 
-ETHERSCAN_API_KEY=<YOUR_ETHERSCAN_V2_API_KEY>
-ETHERSCAN_V2_BASE_URL=https://api.etherscan.io/v2/api
+RESEARCH_SEARCH_ENABLED=false
+RESEARCH_SEARCH_PROVIDER=
+RESEARCH_SEARCH_API_KEY=
 
 STORAGE_PROVIDER=walrus_sdk_relay
 WALRUS_NETWORK=mainnet
@@ -175,14 +175,14 @@ npm run build
 - Sui proof signing happens in the connected browser wallet; the server never signs transactions.
 - Tatum Sui RPC routes are read-only and allowlisted.
 - The local JSON session store is for controlled evaluation and is ignored by Git.
-- EVM reports use Etherscan V2 when configured and do not fall back to Moralis, Alchemy, Covalent, or Chainbase.
+- The active onchain analyzer is Sui-native and does not use non-Sui provider fallbacks.
 
 ## Known Demo Limitations
 
 - Local JSON session storage is suitable for controlled judging and local operation, not serverless production persistence.
 - Mainnet storage and proof anchoring require real wallet approvals and sufficient SUI/WAL balance.
 - Sensitive production traces should be encrypted before public decentralized storage upload.
-- EVM enrichment requires a server-side Etherscan V2 API key.
+- Optional external research search is disabled by default; specialist agents still produce prompt-specific reports from sealed inputs.
 
 ## References
 

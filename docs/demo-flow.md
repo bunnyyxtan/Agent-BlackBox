@@ -31,13 +31,20 @@ proof metadata on Sui Mainnet, verifies through Tatum Sui RPC, and catches tampe
 
 ## Judge Sound Bite
 
-“Agent BlackBox is a flight recorder for AI agents. The full trace is stored on Walrus, compact proof
+"Agent BlackBox is a flight recorder for AI agents. The full trace is stored on Walrus, compact proof
 metadata is anchored on Sui, Tatum Sui RPC verifies the chain evidence, and the tamper test proves why
-the record is valuable.”
+the record is valuable."
+
+## Suggested Demo Prompts
+
+- Sui wallet holdings analysis: analyze a Sui wallet and list token holdings returned by Sui RPC.
+- Walrus storage system research: explain how Walrus stores sealed AI-agent traces and supports readback verification.
+- Hackathon deployment risk review: review public API abuse, Walrus upload failures, Sui anchoring mistakes, and user trust risks.
+- Hackathon build delivery proof: create a sealed delivery receipt for the submitted prototype.
 
 ## Recovery Notes
 
 - If Walrus upload fails, re-run from the Walrus storage step; sealed agent steps stay preserved.
 - If Sui anchoring returns a transaction digest but no proof object ID, the session stays pending until
   Tatum RPC can verify the object or event.
-- If Etherscan V2 is not configured, Sui proof verification is unaffected; EVM enrichment runs as a preliminary report.
+- If Sui public RPC has limited history, the Sui analyzer says so clearly and never invents activity.

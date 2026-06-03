@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { getSessionEvidenceStatus } from "@/lib/constants";
 import { getNetworkConfig } from "@/lib/network-config";
-import { getEtherscanV2Status } from "@/lib/onchain/providers/etherscan-v2";
 import { guardApiRequest } from "@/lib/security/api-guard";
 import { listSessions } from "@/lib/session-service";
 import { getUploadRelayTipConfig } from "@/lib/storage-adapters/walrus-sdk-relay";
@@ -37,7 +36,6 @@ export async function GET(request: Request) {
   const proof = getSuiProofRegistryConfig();
   const network = getNetworkConfig();
   const tatum = getTatumSuiRpcConfig();
-  const etherscan = getEtherscanV2Status();
   const result = {
     agentRuntimeKeyPresent: Boolean(process.env.OPENAI_API_KEY?.trim()),
     tatumKeyPresent: tatum.apiKeyConfigured,
@@ -48,11 +46,6 @@ export async function GET(request: Request) {
     tatumRpcReachable: tatumReachability.reachable,
     tatumRpcCheckedAt: tatumReachability.checkedAt,
     tatumRpcMessage: tatumReachability.message,
-    etherscanConfigured: etherscan.configured,
-    etherscanStatus: etherscan.configured ? "Configured" : "Missing API Key",
-    etherscanApiKeyPresent: etherscan.apiKeyPresent,
-    etherscanHost: etherscan.baseUrlHost,
-    etherscanMessage: etherscan.message,
     walrusRelayConfigured: walrus.relayConfigured,
     walrusRelayReachable: relayStatus.reachable,
     walrusRelayTipRequirement: relayStatus.tipRequirement,

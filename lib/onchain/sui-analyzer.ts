@@ -1,14 +1,18 @@
 import "server-only";
 
-import { getSuiRpcSummary } from "@/lib/onchain/providers/sui-rpc";
+import { getSuiRpcSummary, type SuiRawBalance } from "@/lib/onchain/providers/sui-rpc";
 import { buildSuiExplorerUrl, type SuiExplorerLinkType } from "@/lib/sui-explorer";
 import type {
-  MultichainOnchainReport,
   OnchainDataSource,
   OnchainDetectedTarget,
   OnchainExplorerLink,
   OnchainFinding,
+  SuiOnchainReport,
+  SuiTokenBalance,
 } from "@/lib/onchain/types";
+
+const SUI_COIN_TYPE = "0x2::sui::SUI";
+const DEFAULT_SUI_RPC_URL = "https://fullnode.mainnet.sui.io:443";
 
 function sourceNames(dataSources: OnchainDataSource[]) {
   return dataSources.filter((source) => source.used).map((source) => source.name);
@@ -39,14 +43,6 @@ function countPageItems(value: unknown) {
   return 0;
 }
 
-function summarizeUnknown(value: unknown, fallback: string) {
-  if (value === undefined || value === null) return fallback;
-  if (Array.isArray(value)) return `${value.length} item(s) returned.`;
-  if (isRecord(value) && Array.isArray(value.data)) return `${value.data.length} item(s) returned.`;
-  if (typeof value === "object") return "Provider returned structured data.";
-  return String(value);
-}
-
 function readTransactionDigest(value: unknown) {
   if (!isRecord(value)) return null;
   if (typeof value.digest === "string") return value.digest;
@@ -70,53 +66,141 @@ function readChangeCounts(value: unknown) {
   };
 }
 
-function buildRiskSignals(transactionDetails: unknown[] | undefined, liveSections: string[]): OnchainFinding[] {
+function readNumber(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function readString(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function inferSymbol(coinType: string, metadata: unknown) {
+  if (coinType === SUI_COIN_TYPE) return "SUI";
+  if (isRecord(metadata) && typeof metadata.symbol === "string" && metadata.symbol.trim()) {
+    return metadata.symbol.trim();
+  }
+  if (/::wal::wal$/i.test(coinType)) return "WAL";
+  return coinType.split("::").pop() || "TOKEN";
+}
+
+function inferDecimals(coinType: string, metadata: unknown) {
+  if (coinType === SUI_COIN_TYPE) return 9;
+  return isRecord(metadata) ? readNumber(metadata.decimals, 0) : 0;
+}
+
+function inferName(symbol: string, metadata: unknown) {
+  if (isRecord(metadata) && typeof metadata.name === "string" && metadata.name.trim()) {
+    return metadata.name.trim();
+  }
+  return symbol;
+}
+
+function formatBalance(raw: string, decimals: number) {
+  try {
+    const value = BigInt(raw);
+    if (decimals <= 0) return value.toString();
+    const divisor = BigInt(10) ** BigInt(decimals);
+    const whole = value / divisor;
+    const fraction = value % divisor;
+    const fractionText = fraction.toString().padStart(decimals, "0").replace(/0+$/, "");
+    return fractionText ? `${whole.toString()}.${fractionText}` : whole.toString();
+  } catch {
+    return raw;
+  }
+}
+
+function buildTokenBalances(
+  balances: SuiRawBalance[] | undefined,
+  metadataByCoinType: Record<string, unknown> | undefined,
+): SuiTokenBalance[] {
+  return (balances ?? []).map((item) => {
+    const metadata = metadataByCoinType?.[item.coinType];
+    const symbol = inferSymbol(item.coinType, metadata);
+    const decimals = inferDecimals(item.coinType, metadata);
+    return {
+      coinType: item.coinType,
+      rawTotalBalance: item.totalBalance,
+      decimals,
+      symbol,
+      name: inferName(symbol, metadata),
+      formattedBalance: formatBalance(item.totalBalance, decimals),
+    };
+  });
+}
+
+function summarizeBalances(tokenBalances: SuiTokenBalance[]) {
+  if (tokenBalances.length === 0) return "No token balances were returned by Sui RPC at analysis time.";
+  return tokenBalances
+    .map((balance) => `${balance.formattedBalance} ${balance.symbol}`)
+    .join(", ");
+}
+
+function buildRiskSignals({
+  transactionDetails,
+  liveSections,
+  tokenBalances,
+}: {
+  transactionDetails: unknown[] | undefined;
+  liveSections: string[];
+  tokenBalances: SuiTokenBalance[];
+}): OnchainFinding[] {
   const details = transactionDetails ?? [];
   const failedTransactions = details.filter((item) => readEffectsStatus(item) === "failure");
+  const findings: OnchainFinding[] = [];
+
+  if (tokenBalances.length > 0) {
+    findings.push({
+      title: "Token holdings returned by Sui RPC",
+      detail: `Live Sui RPC returned token balances for this wallet: ${summarizeBalances(tokenBalances)}.`,
+      severity: "info",
+      evidence: "suix_getAllBalances / sui_getCoinMetadata",
+    });
+  }
+
   if (failedTransactions.length > 0) {
     const digest = readTransactionDigest(failedTransactions[0]) ?? "unknown digest";
-    return [
-      {
-        title: "Failed transaction observed",
-        detail: `Available public RPC data includes ${failedTransactions.length} failed transaction(s). Review the first observed digest for context: ${digest}.`,
-        severity: "medium",
-        evidence: `Sui public RPC transaction digest ${digest}`,
-      },
-    ];
-  }
-
-  if (details.length > 0) {
-    return [
-      {
-        title: "No suspicious activity detected in available RPC data",
-        detail: "No suspicious activity detected in available RPC data.",
-        severity: "info",
-        evidence: liveSections.length > 0 ? liveSections.join(", ") : "Sui public RPC",
-      },
-    ];
-  }
-
-  return [
-    {
-      title: "Insufficient transaction history",
+    findings.push({
+      title: "Failed transaction observed",
+      detail: `Available public RPC data includes ${failedTransactions.length} failed transaction(s). Review the first observed digest for context: ${digest}.`,
+      severity: "medium",
+      evidence: `Sui public RPC transaction digest ${digest}`,
+    });
+  } else if (details.length > 0) {
+    findings.push({
+      title: "No suspicious activity detected in available RPC data",
+      detail: "No suspicious activity detected in available RPC data.",
+      severity: "info",
+      evidence: liveSections.length > 0 ? liveSections.join(", ") : "Sui public RPC",
+    });
+  } else {
+    findings.push({
+      title: "Limited transaction history from public RPC",
       detail: "Insufficient transaction history available from public RPC for a high-confidence suspicious activity assessment.",
       severity: "info",
       evidence: "Sui public RPC query result",
-    },
-  ];
+    });
+  }
+
+  return findings;
 }
 
-export async function analyzeSuiTarget(detected: OnchainDetectedTarget): Promise<MultichainOnchainReport> {
+export async function analyzeSuiTarget(detected: OnchainDetectedTarget): Promise<SuiOnchainReport> {
   const rpcSummary = await getSuiRpcSummary({
     target: detected.target,
     targetType: detected.targetType,
   });
   const dataSources = [rpcSummary.source];
   const liveSections = sourceNames(dataSources);
-  const enrichmentStatus = liveSections.length > 0 ? "live" : "failed";
+  const tokenBalances = buildTokenBalances(rpcSummary.coinBalances, rpcSummary.coinMetadata);
+  const balanceLookupStatus = rpcSummary.balanceLookupStatus ?? (detected.targetType === "sui_wallet" ? "failed" : "skipped");
+  const enrichmentStatus = liveSections.length > 0
+    ? balanceLookupStatus === "failed"
+      ? "partial"
+      : "live"
+    : "failed";
   const targetLabel = detected.targetType.replace(/_/g, " ");
   const transactionDetails = rpcSummary.transactionDetails ?? [];
-  const riskSignals = buildRiskSignals(transactionDetails, liveSections);
+  const riskSignals = buildRiskSignals({ transactionDetails, liveSections, tokenBalances });
   const firstChangeCounts = readChangeCounts(transactionDetails[0]);
   const recentTransactionCount = rpcSummary.transactionBlocks?.length ?? transactionDetails.length;
 
@@ -125,10 +209,18 @@ export async function analyzeSuiTarget(detected: OnchainDetectedTarget): Promise
       title: "Assumption recorded",
       detail: detected.assumptions.join(" "),
       severity: "low",
-      evidence: "Chain auto-detection",
+      evidence: "Sui target detection",
     });
   }
 
+  const balanceLimit =
+    balanceLookupStatus === "completed"
+      ? ""
+      : balanceLookupStatus === "empty"
+        ? "No token balances were returned by Sui RPC at analysis time."
+        : balanceLookupStatus === "failed"
+          ? "Sui balance lookup failed. This report is preliminary for wallet holdings."
+          : "";
   const publicRpcLimit =
     "This report uses available Sui public RPC data only. Deep indexed history is not configured.";
   const insufficientHistory =
@@ -137,16 +229,18 @@ export async function analyzeSuiTarget(detected: OnchainDetectedTarget): Promise
       : "";
   const limitations = [
     publicRpcLimit,
+    ...(balanceLimit ? [balanceLimit] : []),
     ...(insufficientHistory ? [insufficientHistory] : []),
-    ...(rpcSummary.balance ? [] : ["Primary SUI balance was not available from public RPC."]),
-    ...(rpcSummary.allBalances ? [] : ["All-balance summary was not available from public RPC."]),
-    ...(rpcSummary.ownedObjects ? [] : ["Owned objects were not available from public RPC."]),
+    ...(rpcSummary.ownedObjects ? [] : detected.targetType === "sui_wallet" ? ["Owned objects were not available from public RPC."] : []),
     ...(rpcSummary.objectData ? [] : detected.targetType === "sui_object" || detected.targetType === "sui_package" ? ["Object/package details were not available from public RPC."] : []),
   ];
 
+  const balanceSummary = summarizeBalances(tokenBalances);
+  const rpcUrl = process.env.SUI_RPC_URL?.trim() || DEFAULT_SUI_RPC_URL;
+
   return {
     header: {
-      agent: "Multichain Onchain Analyzer",
+      agent: "Sui Onchain Analyzer",
       detectedChain: `Sui ${detected.network}`,
       targetType: detected.targetType,
       target: detected.target,
@@ -163,32 +257,43 @@ export async function analyzeSuiTarget(detected: OnchainDetectedTarget): Promise
     dataSources,
     executiveSummary:
       liveSections.length > 0
-        ? `Analyzed ${targetLabel} on Sui ${detected.network} using official Sui public JSON-RPC.`
-        : `Prepared a Sui-first report for ${targetLabel}, but public RPC did not return usable live data for this target.`,
+        ? `Analyzed ${targetLabel} on Sui ${detected.network} using Sui JSON-RPC. ${detected.targetType === "sui_wallet" ? `Wallet holdings: ${balanceSummary}` : "Target details were read where available."}`
+        : `Prepared a Sui report for ${targetLabel}, but public RPC did not return usable live data for this target.`,
     targetProfile: [
       `Target: ${detected.target ?? "Not supplied"}`,
       `Target type: ${detected.targetType}`,
       `Network: Sui ${detected.network}`,
-      `Primary SUI balance: ${summarizeUnknown(rpcSummary.balance, "Not available")}`,
-      `All balances: ${summarizeUnknown(rpcSummary.allBalances, "Not available")}`,
-      `Owned objects: ${summarizeUnknown(rpcSummary.ownedObjects, "Not available")}`,
-      `Provider: official Sui public JSON-RPC (${process.env.SUI_RPC_URL?.trim() || "https://fullnode.mainnet.sui.io:443"})`,
+      `Provider: Sui JSON-RPC (${rpcUrl})`,
+      detected.targetType === "sui_wallet"
+        ? `Token holdings: ${balanceSummary}`
+        : `Object/package details: ${rpcSummary.objectData ? "returned" : "not requested or unavailable"}`,
+      `Owned objects: ${countPageItems(rpcSummary.ownedObjects)} record(s) returned.`,
     ],
     activityAnalysis: [
+      detected.targetType === "sui_wallet"
+        ? `Balance lookup status: ${balanceLookupStatus}. ${rpcSummary.balanceLookupMessage ?? balanceSummary}`
+        : "Balance lookup was skipped because the target is not a wallet.",
       `Recent transaction blocks returned: ${recentTransactionCount}.`,
       `Transaction details read: ${transactionDetails.length}.`,
-      `Owned object records returned: ${countPageItems(rpcSummary.ownedObjects)}.`,
       `First transaction change summary: ${firstChangeCounts.balanceChanges} balance change(s), ${firstChangeCounts.objectChanges} object change(s), ${firstChangeCounts.events} event(s).`,
       rpcSummary.objectData
-        ? "Object/package data was returned by the official Sui public RPC."
+        ? "Object/package data was returned by Sui public RPC."
         : "No object/package details were read for this target.",
-      "Sui/Walrus remains the primary proof path: the report is sealed into a BlackBox trace, stored on Walrus, and anchored on Sui.",
+      "Sui/Walrus remains the proof path: the report is sealed into a BlackBox trace, stored on Walrus, and anchored on Sui.",
     ],
     riskSignals,
     evidenceStatus: [
+      "Sui wallet detected",
+      detected.targetType === "sui_wallet"
+        ? `Sui balance lookup ${balanceLookupStatus}`
+        : "Sui balance lookup skipped for non-wallet target",
+      tokenBalances.length > 0
+        ? `Coin metadata lookup completed for ${tokenBalances.length} token(s).`
+        : "Coin metadata lookup did not return token records.",
       ...dataSources.map((source) => `${source.name}: ${source.status} - ${source.message}`),
       `RPC methods attempted: ${rpcSummary.attemptedMethods.join(", ") || "none"}`,
       `Explorer link count: ${buildExplorerLinks(detected).length}`,
+      "Report finalized",
     ],
     limitations,
     recommendedNextActions: [
@@ -204,11 +309,14 @@ export async function analyzeSuiTarget(detected: OnchainDetectedTarget): Promise
       anchorLayer: "Sui Mainnet proof anchor",
       rpcVerification: "Tatum Sui Mainnet RPC for proof reads",
       notes: [
-        "Sui analysis in this version uses official Sui JSON-RPC only.",
-        "No gRPC, paid Sui provider, Sui indexer, SuiVision, Suiscan, or BlockVision key is required.",
+        "Sui analysis uses JSON-RPC only.",
+        "No non-Sui provider path is part of this Sui-native analyzer.",
         "Analyzer enrichment never replaces deterministic trace hashing or proof verification.",
       ],
     },
     explorerLinks: buildExplorerLinks(detected),
+    tokenBalances,
+    balanceLookupStatus,
+    balanceLookupMessage: rpcSummary.balanceLookupMessage,
   };
 }

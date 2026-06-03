@@ -19,7 +19,6 @@ const LABEL_OVERRIDES: Record<string, string> = {
   disabled: "Disabled",
   done: "Completed",
   error: "Action Needed",
-  evm_wallet: "EVM Wallet",
   failed: "Failed",
   found: "Found",
   invalid_json: "Invalid Response",
@@ -193,7 +192,6 @@ function titleCase(value: string) {
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/\bevm\b/gi, "EVM")
     .replace(/\bsui\b/gi, "Sui")
     .replace(/\brpc\b/gi, "RPC")
     .replace(/\bsdk\b/gi, "SDK")

@@ -9,7 +9,7 @@ export function SystemIntegrityPanel() {
     { label: `${walrusNetworkLabel} Blob Storage`, status: "Prepared", iconName: "solar:cloud-storage-line-duotone", protocol: "walrus" as Protocol },
     { label: `Direct ${walrusNetworkLabel} Verification`, status: "Prepared", iconName: "solar:database-line-duotone", protocol: "walrus" as Protocol },
     { label: "Sui Mainnet RPC via Tatum", status: "Prepared", iconName: "solar:server-line-duotone", protocol: "tatum" as Protocol },
-    { label: "Etherscan V2 EVM Enrichment", status: "Optional", iconName: "solar:chart-line-duotone" },
+    { label: "Sui Wallet/Object Analyzer", status: "Prepared", iconName: "solar:chart-line-duotone", protocol: "sui" as Protocol },
   ];
   return (
     <GlassCard className="p-6">

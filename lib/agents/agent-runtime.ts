@@ -4,7 +4,11 @@ import OpenAI from "openai";
 
 import { AGENT_MODE_DEFINITIONS, buildAgentSystemPrompt, buildAgentUserPrompt } from "@/lib/agents/agent-prompts";
 import { AGENT_RUNTIME_JSON_SCHEMA, normalizeAgentRuntimeOutput } from "@/lib/agents/agent-schemas";
-import { isSpecialistAgentReport } from "@/lib/agents/specialist-report";
+import {
+  formatSpecialistFinalOutput,
+  isSpecialistAgentReport,
+  type SpecialistAgentReport,
+} from "@/lib/agents/specialist-report";
 import {
   collectPreModelToolObservations,
   finalizeAgentReport,
@@ -12,7 +16,7 @@ import {
   serializeToolObservations,
 } from "@/lib/agents/agent-tools";
 import type { AgentRuntimeInput, AgentRuntimeOutput, AgentRuntimeToolCall } from "@/lib/agents/types";
-import type { MultichainOnchainReport } from "@/lib/onchain/types";
+import type { SuiOnchainReport } from "@/lib/onchain/types";
 
 export class AgentRuntimeSetupError extends Error {
   statusCode = 503;
@@ -94,7 +98,7 @@ function tryParseRuntimeJson(content: string) {
   }
 }
 
-function isOnchainReport(value: unknown): value is MultichainOnchainReport {
+function isOnchainReport(value: unknown): value is SuiOnchainReport {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -102,6 +106,62 @@ function isOnchainReport(value: unknown): value is MultichainOnchainReport {
     "detected" in value &&
     "dataSources" in value
   );
+}
+
+function formatSuiOnchainFinalOutput(report: SuiOnchainReport) {
+  const balances = report.tokenBalances?.length
+    ? report.tokenBalances.map((item) => `${item.formattedBalance} ${item.symbol}`).join(", ")
+    : report.balanceLookupMessage || "No token balances were returned by Sui RPC at analysis time.";
+  return [
+    report.executiveSummary,
+    "",
+    "Target profile:",
+    ...report.targetProfile.slice(0, 6).map((item) => `- ${item}`),
+    "",
+    "Sui holdings:",
+    `- ${balances}`,
+    "",
+    "Activity and risk notes:",
+    ...report.riskSignals.slice(0, 4).map((item) => `- ${item.title}: ${item.detail}`),
+    "",
+    "Recommended next steps:",
+    ...report.recommendedNextActions.slice(0, 3).map((item) => `- ${item}`),
+  ].join("\n");
+}
+
+function applySpecialistOverlay(output: AgentRuntimeOutput, specialist: SpecialistAgentReport): AgentRuntimeOutput {
+  return {
+    ...output,
+    executiveSummary: specialist.cards[0]?.detail ?? output.executiveSummary,
+    findings: specialist.cards.slice(0, 5).map((card) => ({
+      title: card.title,
+      detail: card.detail,
+      severity: card.severity,
+      evidence: card.evidence,
+    })),
+    finalOutput: formatSpecialistFinalOutput(specialist),
+    confidence: specialist.confidence,
+    limitations: specialist.limitations,
+    recommendedNextActions: specialist.recommendedNextActions,
+  };
+}
+
+function applySuiOnchainOverlay(output: AgentRuntimeOutput, onchain: SuiOnchainReport): AgentRuntimeOutput {
+  return {
+    ...output,
+    agentDisplayName: "Sui Onchain Analyzer",
+    executiveSummary: onchain.executiveSummary,
+    findings: onchain.riskSignals.slice(0, 5).map((finding) => ({
+      title: finding.title,
+      detail: finding.detail,
+      severity: finding.severity,
+      evidence: finding.evidence,
+    })),
+    finalOutput: formatSuiOnchainFinalOutput(onchain),
+    confidence: onchain.header.confidence,
+    limitations: onchain.limitations,
+    recommendedNextActions: onchain.recommendedNextActions,
+  };
 }
 
 export async function runAgentRuntime(input: AgentRuntimeInput): Promise<AgentRuntimeOutput> {
@@ -188,12 +248,18 @@ export async function runAgentRuntime(input: AgentRuntimeInput): Promise<AgentRu
     );
   }
 
-  const seededOutput: AgentRuntimeOutput = sanitizeRuntimeOutput({
+  let seededOutput: AgentRuntimeOutput = sanitizeRuntimeOutput({
     ...normalized,
     agentMode: input.agentMode,
     agentDisplayName: definition.displayName,
     taskTitle: input.taskTitle,
   });
+  if (specialistAnalysis) {
+    seededOutput = sanitizeRuntimeOutput(applySpecialistOverlay(seededOutput, specialistAnalysis));
+  }
+  if (onchainAnalysis) {
+    seededOutput = sanitizeRuntimeOutput(applySuiOnchainOverlay(seededOutput, onchainAnalysis));
+  }
   const postModelTools = [
     hashTracePreview(input, seededOutput),
     finalizeAgentReport(seededOutput),

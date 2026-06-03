@@ -874,7 +874,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
             </h1>
             <p className="muted mt-2 max-w-3xl text-zinc-500">
               Choose an agent, give it a task, and Agent BlackBox will create the proof trail automatically.
-              Analyze Sui wallets, objects, packages, and EVM addresses with a sealed Agent BlackBox trace.
+              Analyze Sui wallets, token holdings, objects, packages, and transactions with a sealed Agent BlackBox trace.
             </p>
           </div>
 

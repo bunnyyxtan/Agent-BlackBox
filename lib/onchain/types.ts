@@ -1,13 +1,10 @@
-export type OnchainFamily = "sui" | "evm" | "unknown";
+export type OnchainFamily = "sui" | "unknown";
 
 export type OnchainTargetType =
   | "sui_wallet"
   | "sui_transaction"
   | "sui_object"
   | "sui_package"
-  | "evm_wallet"
-  | "evm_transaction"
-  | "evm_contract"
   | "unknown";
 
 export type OnchainConfidence = "low" | "medium" | "high";
@@ -28,27 +25,9 @@ export type OnchainEnrichmentStatus =
   | "not_configured"
   | "failed";
 
-export type EvmChainKey =
-  | "ethereum"
-  | "base"
-  | "arbitrum"
-  | "optimism"
-  | "polygon"
-  | "bsc"
-  | "avalanche"
-  | "linea";
-
-export interface EvmChainConfig {
-  key: EvmChainKey;
-  chainId: number;
-  name: string;
-  explorerBaseUrl: string;
-}
-
 export interface OnchainDetectedTarget {
   family: OnchainFamily;
   chain: string;
-  chainId?: number;
   network: string;
   targetType: OnchainTargetType;
   target: string | null;
@@ -77,42 +56,18 @@ export interface OnchainExplorerLink {
   url: string;
 }
 
-export interface OnchainProviderEvidence {
-  provider: "Etherscan V2";
-  actionName: string;
-  chainId?: number;
-  network?: string;
-  target?: string;
-  status: "completed" | "failed" | "skipped";
-  summary: string;
-  startedAt: string;
-  completedAt: string;
-  inputHash: string;
-  outputHash?: string;
-  resultUsedInReport: boolean;
-  error?: {
-    code: string;
-    message: string;
-    status?: string;
-    details?: string;
-  };
+export interface SuiTokenBalance {
+  coinType: string;
+  rawTotalBalance: string;
+  decimals: number;
+  symbol: string;
+  name?: string;
+  formattedBalance: string;
 }
 
-export interface EtherscanProviderStatusSnapshot {
-  configured: boolean;
-  status: "configured" | "missing_api_key" | "unavailable";
-  provider: "Etherscan V2";
-  apiKeyPresent: boolean;
-  baseUrlHost: string;
-  nodeVersion?: string;
-  checkedAt: string;
-  message: string;
-  details?: string;
-}
-
-export interface MultichainOnchainReport {
+export interface SuiOnchainReport {
   header: {
-    agent: "Multichain Onchain Analyzer";
+    agent: "Sui Onchain Analyzer";
     detectedChain: string;
     targetType: OnchainTargetType;
     target: string | null;
@@ -138,8 +93,9 @@ export interface MultichainOnchainReport {
     notes: string[];
   };
   explorerLinks: OnchainExplorerLink[];
-  etherscanStatus?: EtherscanProviderStatusSnapshot;
-  providerEvidence?: OnchainProviderEvidence[];
+  tokenBalances?: SuiTokenBalance[];
+  balanceLookupStatus?: "completed" | "empty" | "failed" | "skipped";
+  balanceLookupMessage?: string;
 }
 
 export interface OnchainAnalyzeRequest {
@@ -154,7 +110,7 @@ export interface OnchainAnalyzeRequest {
 
 export interface OnchainAnalyzeSuccess {
   ok: true;
-  report: MultichainOnchainReport;
+  report: SuiOnchainReport;
   detected: OnchainDetectedTarget;
   dataSources: OnchainDataSource[];
 }

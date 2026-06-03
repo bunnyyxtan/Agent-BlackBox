@@ -18,9 +18,18 @@ interface SuiRpcCall<T = unknown> {
   message: string;
 }
 
+export interface SuiRawBalance {
+  coinType: string;
+  totalBalance: string;
+}
+
 export interface SuiRpcSummary {
   balance?: unknown;
   allBalances?: unknown;
+  coinBalances?: SuiRawBalance[];
+  coinMetadata?: Record<string, unknown>;
+  balanceLookupStatus?: "completed" | "empty" | "failed" | "skipped";
+  balanceLookupMessage?: string;
   ownedObjects?: unknown;
   transactionBlocks?: unknown[];
   transactionDetails?: unknown[];
@@ -105,6 +114,47 @@ function readPageData(value: unknown) {
   return value.data;
 }
 
+function readStringField(value: unknown, field: string) {
+  return isRecord(value) && typeof value[field] === "string" ? value[field] : null;
+}
+
+function parseAllBalances(value: unknown): SuiRawBalance[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const coinType = readStringField(item, "coinType");
+    const totalBalance = readStringField(item, "totalBalance");
+    return coinType && totalBalance ? [{ coinType, totalBalance }] : [];
+  });
+}
+
+function parseCoinPageBalances(value: unknown): SuiRawBalance[] {
+  const totals = new Map<string, bigint>();
+  readPageData(value).forEach((coin) => {
+    const coinType = readStringField(coin, "coinType");
+    const balance = readStringField(coin, "balance");
+    if (!coinType || !balance) return;
+    try {
+      totals.set(coinType, (totals.get(coinType) ?? BigInt(0)) + BigInt(balance));
+    } catch {
+      // Ignore malformed coin records rather than failing the whole wallet report.
+    }
+  });
+  return Array.from(totals.entries()).map(([coinType, total]) => ({
+    coinType,
+    totalBalance: total.toString(),
+  }));
+}
+
+async function fetchCoinMetadata(coinTypes: string[]) {
+  const entries = await Promise.all(
+    coinTypes.slice(0, 20).map(async (coinType) => {
+      const result = await callSuiRpc("sui_getCoinMetadata", [coinType]);
+      return [coinType, result] as const;
+    }),
+  );
+  return Object.fromEntries(entries.flatMap(([coinType, result]) => (result.ok ? [[coinType, result.result]] : [])));
+}
+
 async function fetchTransactionDetails(digests: string[]) {
   const details = await Promise.all(
     digests.slice(0, 5).map((digest) =>
@@ -165,15 +215,18 @@ export async function getSuiRpcSummary({
 
   if (targetType === "sui_wallet") {
     const attemptedMethods = [
-      "suix_getBalance",
       "suix_getAllBalances",
+      "suix_getCoins",
+      "sui_getCoinMetadata",
+      "suix_getBalance",
       "suix_getOwnedObjects",
       "suix_queryTransactionBlocks",
       "sui_getTransactionBlock",
     ];
-    const [balance, allBalances, ownedObjects, transactionBlocks] = await Promise.all([
-      callSuiRpc("suix_getBalance", [target]),
+    const [allBalances, coinPage, balance, ownedObjects, transactionBlocks] = await Promise.all([
       callSuiRpc("suix_getAllBalances", [target]),
+      callSuiRpc("suix_getCoins", [target, null, null, 50]),
+      callSuiRpc("suix_getBalance", [target]),
       callSuiRpc("suix_getOwnedObjects", [
         target,
         { options: { showType: true, showOwner: true, showContent: false } },
@@ -200,16 +253,39 @@ export async function getSuiRpcSummary({
         true,
       ]),
     ]);
+    const primaryBalances = allBalances.ok ? parseAllBalances(allBalances.result) : [];
+    const fallbackBalances = primaryBalances.length === 0 && coinPage.ok ? parseCoinPageBalances(coinPage.result) : [];
+    const coinBalances = primaryBalances.length > 0 ? primaryBalances : fallbackBalances;
+    const coinMetadata = await fetchCoinMetadata(coinBalances.map((item) => item.coinType));
+    const metadataResults = Object.keys(coinMetadata).length > 0
+      ? [{ ok: true, message: "Coin metadata lookup completed." }]
+      : coinBalances.length > 0
+        ? [{ ok: false, message: "Coin metadata lookup returned no usable records." }]
+        : [];
     const transactionDigests = readPageData(transactionBlocks.result)
       .map(readTransactionDigest)
       .filter((digest): digest is string => Boolean(digest));
     const transactionDetails = await fetchTransactionDetails(transactionDigests);
     return buildSummary({
       attemptedMethods,
-      results: [balance, allBalances, ownedObjects, transactionBlocks, ...transactionDetails],
+      results: [allBalances, coinPage, balance, ownedObjects, transactionBlocks, ...metadataResults, ...transactionDetails],
       payload: {
         balance: balance.ok ? balance.result : undefined,
         allBalances: allBalances.ok ? allBalances.result : undefined,
+        coinBalances,
+        coinMetadata,
+        balanceLookupStatus:
+          coinBalances.length > 0
+            ? "completed"
+            : allBalances.ok || coinPage.ok
+              ? "empty"
+              : "failed",
+        balanceLookupMessage:
+          coinBalances.length > 0
+            ? `Sui RPC returned ${coinBalances.length} token balance record(s).`
+            : allBalances.ok || coinPage.ok
+              ? "Sui RPC completed but returned no token balances."
+              : `${allBalances.message} ${coinPage.message}`.trim() || "Sui balance lookup failed.",
         ownedObjects: ownedObjects.ok ? ownedObjects.result : undefined,
         transactionBlocks: transactionBlocks.ok ? readPageData(transactionBlocks.result) : undefined,
         transactionDetails: transactionDetails.flatMap((item) => (item.ok && item.result ? [item.result] : [])),

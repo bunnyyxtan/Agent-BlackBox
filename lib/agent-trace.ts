@@ -106,17 +106,17 @@ function buildLocalReportSections({
     return {
       executiveSummary:
         suiTargets.length > 0
-          ? `Multichain Onchain Analyzer prepared a preliminary Sui target report for "${title}" using the supplied wallet or address-format evidence.`
-          : `Multichain Onchain Analyzer prepared an evidence boundary report for "${title}" and flagged the missing onchain target input.`,
+          ? `Sui Onchain Analyzer prepared a preliminary Sui target report for "${title}" using the supplied wallet or address-format evidence.`
+          : `Sui Onchain Analyzer prepared an evidence boundary report for "${title}" and flagged the missing Sui target input.`,
       finalOutput: [
-        `Multichain Onchain Analyzer Report: ${title}`,
+        `Sui Onchain Analyzer Report: ${title}`,
         "",
         "Target Analyzed",
         targetLine,
         "",
         "Evidence Reviewed",
         `Operator prompt: ${promptPreview}`,
-        "No live wallet activity was fabricated. Direct enrichment requires a transaction digest, object ID, package ID, or indexed wallet history evidence.",
+        "No wallet activity was fabricated. Live enrichment requires a Sui wallet, transaction digest, object ID, or package ID.",
         "",
         "Findings",
         suiTargets.length > 0

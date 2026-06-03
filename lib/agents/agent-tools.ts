@@ -19,7 +19,7 @@ import type {
 } from "@/lib/agents/types";
 import { createHashFromString, createResultHash, stableStringify } from "@/lib/hash";
 import { analyzeOnchainInput } from "@/lib/onchain/analyzer-router";
-import type { MultichainOnchainReport, OnchainProviderEvidence } from "@/lib/onchain/types";
+import type { SuiOnchainReport } from "@/lib/onchain/types";
 import { getSuiObject, getTransactionBlock } from "@/lib/tatum-rpc";
 
 function summarizeFiles(input: AgentRuntimeInput) {
@@ -118,61 +118,21 @@ function extractPotentialTargets(text: string) {
   };
 }
 
-function summarizeOnchainReport(report: MultichainOnchainReport) {
+function summarizeOnchainReport(report: SuiOnchainReport) {
   const providerSummary = report.dataSources
     .map((source) => `${source.name}: ${source.status}`)
     .join("; ");
-  const providerDisplay = report.header.dataSourcesUsed.join(", ")
-    || (report.detected.family === "evm" ? "Etherscan V2 attempted" : "none");
-  const preliminaryNote =
-    report.detected.family === "evm" && report.header.enrichmentStatus === "preliminary"
-      ? `Live ${report.header.detectedChain} wallet enrichment could not be completed, so no activity claim is made.`
-      : report.limitations.slice(0, 1).join(" ") || "none recorded";
+  const providerDisplay = report.header.dataSourcesUsed.join(", ") || "Sui RPC not used";
+  const tokenSummary = report.tokenBalances?.length
+    ? `Token balances: ${report.tokenBalances.map((item) => `${item.formattedBalance} ${item.symbol}`).join(", ")}.`
+    : report.balanceLookupMessage ?? "No token balance summary returned.";
   return [
     `Detected ${report.header.detectedChain}, ${report.header.targetType}, ${report.header.target ?? "no target"}.`,
     `Enrichment status: ${report.header.enrichmentStatus}.`,
     `Provider: ${providerDisplay}.`,
     `Data sources: ${providerSummary || "none"}.`,
-    `Boundary: ${preliminaryNote}`,
+    `Holdings: ${tokenSummary}`,
   ].join(" ");
-}
-
-function summarizeProviderEvidenceInput(call: OnchainProviderEvidence) {
-  return [
-    call.network ? `Network: ${call.network}` : "",
-    call.target ? `Target: ${call.target}` : "",
-  ].filter(Boolean).join("; ") || "Etherscan V2 provider input.";
-}
-
-function createProviderEvidenceObservation(call: OnchainProviderEvidence) {
-  return createObservation(
-    `Etherscan V2: ${call.actionName}`,
-    "Records an Etherscan V2 provider call used for EVM enrichment.",
-    summarizeProviderEvidenceInput(call),
-    [
-      "Provider: Etherscan V2",
-      `Action: ${call.actionName}`,
-      call.network ? `Network: ${call.network}` : "",
-      call.target ? `Target: ${call.target}` : "",
-      `Status: ${call.status}`,
-      `Result: ${call.summary}`,
-      `Used in report: ${call.resultUsedInReport ? "Yes" : "No"}`,
-    ].filter(Boolean).join(" | "),
-    call.status,
-    {
-      provider: call.provider,
-      actionName: call.actionName,
-      chainId: call.chainId,
-      network: call.network,
-      target: call.target,
-      status: call.status,
-      startedAt: call.startedAt,
-      completedAt: call.completedAt,
-      inputHash: call.inputHash,
-      outputHash: call.outputHash,
-      resultUsedInReport: call.resultUsedInReport,
-    },
-  );
 }
 
 function summarizeSpecialistReport(report: NonNullable<ReturnType<typeof buildSpecialistAgentReport>>) {
@@ -187,7 +147,7 @@ function summarizeSpecialistReport(report: NonNullable<ReturnType<typeof buildSp
     `${report.agent} prepared ${report.kind.replace(/_/g, " ")} for ${report.subject}.`,
     `Confidence: ${report.confidence}.`,
     `Scorecard: ${metricSummary || "not recorded"}.`,
-    `Evidence: ${evidenceSummary || "user-provided input only"}.`,
+    `Evidence: ${evidenceSummary || "sealed task prompt"}.`,
     `Sections: ${report.sections.map((section) => section.title).join(", ")}.`,
   ].join(" ");
 }
@@ -208,7 +168,7 @@ export function analyzeSpecialistAgentContext(input: AgentRuntimeInput) {
       "analyzeSpecialistAgentContext",
       "Builds a structured specialist report scaffold for research, risk, and delivery agents.",
       "Onchain agent mode.",
-      "Skipped because the Multichain Onchain Analyzer uses the onchain target analyzer.",
+      "Skipped because the Sui Onchain Analyzer uses the onchain target analyzer.",
       "skipped",
     );
   }
@@ -227,7 +187,7 @@ export async function analyzeOnchainTarget(input: AgentRuntimeInput) {
   if (input.agentMode !== "onchain_monitor") {
     return createObservation(
       "analyzeOnchainTarget",
-      "Detects Sui and EVM onchain targets from the task title and prompt.",
+      "Detects Sui wallet, object, package, and transaction targets from the task title and prompt.",
       "Non-onchain agent mode.",
       "Skipped because onchain target detection was not required for this agent mode.",
       "skipped",
@@ -248,7 +208,7 @@ export async function analyzeOnchainTarget(input: AgentRuntimeInput) {
 
   return createObservation(
     "analyzeOnchainTarget",
-    "Detects Sui and EVM targets, routes to configured providers, and prepares a chain-aware report.",
+    "Detects Sui targets, reads available Sui RPC data, and prepares a Sui-native report.",
     `${input.taskTitle}: ${input.taskPrompt.slice(0, 180)}`,
     summarizeOnchainReport(report),
     "completed",
@@ -365,10 +325,6 @@ export async function collectPreModelToolObservations(input: AgentRuntimeInput) 
   if (input.agentMode === "onchain_monitor") {
     const targetObservation = await analyzeOnchainTarget(input);
     observations.push(targetObservation);
-    const onchainReport = targetObservation.raw as MultichainOnchainReport | undefined;
-    onchainReport?.providerEvidence
-      ?.filter((call) => call.status === "completed")
-      .forEach((call) => observations.push(createProviderEvidenceObservation(call)));
     observations.push(prepareWalrusTrace(input));
     return observations;
   }

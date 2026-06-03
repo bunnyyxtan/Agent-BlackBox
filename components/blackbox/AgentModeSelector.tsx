@@ -38,10 +38,10 @@ const modes: {
   {
     id: "onchain_monitor",
     icon: "solar:radar-line-duotone",
-    simpleMeaning: "Analyzes onchain behavior.",
-    useFor: "analyzing Sui wallets, transactions, objects, packages, and EVM addresses with a sealed trace.",
-    needs: "Wallet address, tx hash/digest, object ID, package ID, or contract address.",
-    output: "Behavior report, risk signals, data-source evidence, and sealed proof metadata.",
+    simpleMeaning: "Analyzes Sui wallet and proof data.",
+    useFor: "Analyzing Sui wallets, token holdings, transactions, objects, and packages with a sealed trace.",
+    needs: "Sui wallet address, transaction digest, object ID, or package ID.",
+    output: "Sui holdings report, risk signals, RPC evidence, and sealed proof metadata.",
   },
 ];
 

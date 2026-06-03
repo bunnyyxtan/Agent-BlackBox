@@ -171,6 +171,8 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
         </div>
       </div>
 
+      <AgentReportPanel session={session} />
+
       <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_27rem]">
         <div className="grid gap-4 sm:grid-cols-2">
           {[
@@ -192,8 +194,6 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
         </div>
         <AnchorProofPanel session={session} />
       </div>
-
-      <AgentReportPanel session={session} />
 
       <div className="mt-5 space-y-5">
         <GlassCard className="p-5">

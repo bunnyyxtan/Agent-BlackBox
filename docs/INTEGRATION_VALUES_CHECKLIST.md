@@ -23,8 +23,9 @@ visibly unconfigured or failed.
 | `OPENAI_API_KEY` | Secret, server-only | user-provided | Agent Runtime |
 | `TATUM_API_KEY` | Secret, server-only | user-provided | Tatum Sui Mainnet RPC authentication |
 | `TATUM_SUI_RPC_URL` | Server-only | `https://sui-mainnet.gateway.tatum.io` | Proof object, transaction, and event reads |
-| `ETHERSCAN_API_KEY` | Secret, server-only | user-provided | EVM wallet and transaction enrichment |
-| `ETHERSCAN_V2_BASE_URL` | Server-only | `https://api.etherscan.io/v2/api` | Etherscan V2 API endpoint |
+| `RESEARCH_SEARCH_ENABLED` | Server-only | `false` | Optional external research search |
+| `RESEARCH_SEARCH_PROVIDER` | Server-only | empty | Optional search provider name |
+| `RESEARCH_SEARCH_API_KEY` | Secret, server-only | user-provided only if enabled | Optional search provider key |
 | `STORAGE_PROVIDER` | Server-only | `walrus_sdk_relay` | Default storage adapter |
 | `WALRUS_NETWORK` | Server-only | `mainnet` | Walrus network label |
 | `WALRUS_UPLOAD_RELAY_URL` | Server-only | `https://upload-relay.mainnet.walrus.space` | Wallet-paid SDK upload relay |
@@ -106,8 +107,9 @@ SUI_NETWORK=mainnet
 OPENAI_API_KEY=<your-agent-runtime-key>
 TATUM_API_KEY=<your-tatum-api-key>
 TATUM_SUI_RPC_URL=https://sui-mainnet.gateway.tatum.io
-ETHERSCAN_API_KEY=<your-etherscan-v2-api-key>
-ETHERSCAN_V2_BASE_URL=https://api.etherscan.io/v2/api
+RESEARCH_SEARCH_ENABLED=false
+RESEARCH_SEARCH_PROVIDER=
+RESEARCH_SEARCH_API_KEY=
 
 STORAGE_PROVIDER=walrus_sdk_relay
 STORAGE_ADAPTER=

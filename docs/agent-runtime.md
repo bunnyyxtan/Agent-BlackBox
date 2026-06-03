@@ -25,7 +25,7 @@ names. Use product language: `Agent`, `Agent Runtime`, `Agent Trace`, `Agent Pla
 | Research Agent | Professional research brief with scope, key findings, evidence/input summary, assumptions, limitations, next actions, proof metadata |
 | Risk Review Agent | Professional risk report with overall rating, scorecard, severity-ranked risks, missing information, exposure analysis, mitigation plan, proof metadata |
 | Delivery Proof Agent | Sealed delivery receipt with evidence bundle, handoff trail, acceptance notes, proof strength, missing evidence, next actions, proof metadata |
-| Multichain Onchain Analyzer | Sui-first target analysis plus EVM enrichment: detected chain, target type, provider status, risk signals, limitations, proof metadata, explorer links |
+| Sui Onchain Analyzer | Sui target analysis: wallet/token balances, transaction details, object/package data, risk signals, limitations, proof metadata, explorer links |
 
 ## Structured Output
 
@@ -44,7 +44,7 @@ confidence
 limitations[]
 recommendedNextActions[]
 specialistAnalysis?  # deterministic Research/Risk/Delivery report payload
-onchainAnalysis?     # deterministic Multichain Onchain Analyzer payload
+onchainAnalysis?     # deterministic Sui Onchain Analyzer payload
 ```
 
 The trace stores summaries and observations only. It does not store hidden reasoning.
@@ -74,27 +74,20 @@ risk categories, and proof notes into a deterministic specialist report. The liv
 that payload, while the trace stores it as `specialistAnalysis` so the UI and exports can show
 scorecards, evidence cards, report sections, limitations, next actions, and proof metadata.
 
-When external search or file-content retrieval is not configured, Research reports explicitly say the
-brief is based on user-provided inputs and attached metadata only. Risk reports avoid inventing
-incidents and classify confidence from supplied evidence. Delivery Proof reports separate claimed
-delivery from provided evidence and missing acceptance/delivery checklist items.
+When external search or file-content retrieval is not configured, Research reports keep that as a
+small note and still produce prompt-specific briefs from sealed inputs and Agent BlackBox context.
+Risk reports produce a severity matrix with mitigations. Delivery Proof reports produce a receipt,
+acceptance checklist, handoff notes, and proof trail.
 
-For Multichain Onchain Analyzer, `analyzeOnchainTarget` routes through `lib/onchain/analyzer-router.ts`.
-It detects Sui wallet addresses, transaction digests, object IDs, package IDs, Sui network hints, EVM
-addresses, EVM transaction hashes, EVM contract context, and EVM chain mentions. Sui remains the
-specialized proof chain for Agent BlackBox; EVM support is additional enrichment captured inside the
-sealed trace.
-
-Provider absence is not treated as a useless failure. Sui targets use Sui public RPC only. EVM targets
-use Etherscan V2 when the server-side key is configured. If Etherscan V2 is missing, unavailable, or
-returns no usable data, the analyzer returns a professional preliminary EVM report without exposing
-raw env names or falling back to Moralis/Alchemy/Covalent/Chainbase. It does not fabricate wallet
-balances, transfers, object state, token activity, contract verification, or suspicious behavior.
+For Sui Onchain Analyzer, `analyzeOnchainTarget` routes through `lib/onchain/analyzer-router.ts`.
+It detects Sui wallet addresses, transaction digests, object IDs, package IDs, and Sui network hints.
+The active product scope is Sui-native: no non-Sui provider fallback is used or shown in normal UI.
 
 Sui analyzer enrichment uses only Sui JSON-RPC in this version. `SUI_RPC_URL` defaults server-side to
 the official public Mainnet fullnode `https://fullnode.mainnet.sui.io:443` when missing. No Sui API key,
 gRPC URL, Sui indexer, SuiVision, Suiscan, BlockVision, or paid Sui provider integration is required
-or configured for this analyzer version.
+or configured for this analyzer version. Wallet reports use `suix_getAllBalances`, fallback coin reads,
+coin metadata, owned objects, transaction blocks, and object/package details where available.
 
 ## Trace Flow
 
