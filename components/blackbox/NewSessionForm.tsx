@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
+import { AnchorProofPanel } from "@/components/blackbox/AnchorProofPanel";
 import { AgentExecutionWorkspace } from "@/components/blackbox/AgentExecutionWorkspace";
-import { AgentModeSelector } from "@/components/blackbox/AgentModeSelector";
 import { FileDropzone } from "@/components/blackbox/FileDropzone";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { ProtocolLogo, type Protocol } from "@/components/ui/ProtocolLogo";
+import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { WalletConnectButton } from "@/components/ui/WalletConnectButton";
 import {
@@ -57,20 +57,43 @@ type ExecutionStepId =
   | "saving";
 
 const EXECUTION_STEPS: Array<{ id: ExecutionStepId; label: string; detail: string }> = [
-  { id: "reading", label: "Reading intent", detail: "Parsing the task prompt, files, mode, and wallet context." },
-  { id: "planning", label: "Building execution plan", detail: "Agent Runtime is shaping the auditable work plan." },
-  { id: "tools", label: "Running tool checks", detail: "Recording deterministic tool evidence for the trace timeline." },
-  { id: "report", label: "Writing agent report", detail: "Producing the structured answer that will be sealed." },
-  { id: "sealing", label: "Sealing trace bundle", detail: "Computing input, result, and trace hashes." },
+  { id: "reading", label: "Reading task", detail: "Understanding your prompt and attached evidence." },
+  { id: "planning", label: "Planning the answer", detail: "Choosing the right agent path for this task." },
+  { id: "tools", label: "Checking data", detail: "Using available Sui, evidence, and report context." },
+  { id: "report", label: "Generating report", detail: "Writing the answer that will be sealed into the proof." },
+  { id: "sealing", label: "Sealing proof trace", detail: "Locking the task, result, and proof trace hashes." },
   {
     id: "uploading",
-    label: "Storing on Walrus Mainnet",
+    label: "Storing proof trace on Walrus",
     detail:
-      "Walrus storage may request two wallet approvals: one to register the blob and one to certify its availability after storage nodes confirm it.",
+      "Your wallet may ask for approval to register and certify the stored trace.",
   },
-  { id: "reading_back", label: "Replaying stored blob", detail: "Reading the stored trace through the Walrus aggregator." },
-  { id: "verifying", label: "Matching trace hash", detail: "Comparing the stored payload against the sealed trace hash." },
-  { id: "saving", label: "Saving verified session", detail: "Persisting the BlackBox session for replay and verification." },
+  { id: "reading_back", label: "Verifying Walrus readback", detail: "Reading the stored proof trace back from Walrus." },
+  { id: "verifying", label: "Checking hash match", detail: "Confirming the stored trace matches the sealed proof." },
+  { id: "saving", label: "Preparing Sui anchor", detail: "Saving the proof so you can anchor it on Sui." },
+];
+
+const AGENT_OPTIONS: Array<{ mode: AgentMode; label: string; description: string }> = [
+  {
+    mode: "onchain_monitor",
+    label: "Sui Wallet Analysis",
+    description: "Analyze Sui wallets, objects, packages, or transactions.",
+  },
+  {
+    mode: "research",
+    label: "Research Brief",
+    description: "Turn a topic or claim into a sealed research report.",
+  },
+  {
+    mode: "risk_review",
+    label: "Risk Review",
+    description: "Find risks, severity, impact, and mitigations.",
+  },
+  {
+    mode: "delivery_proof",
+    label: "Delivery Proof",
+    description: "Create a sealed delivery receipt for completed work.",
+  },
 ];
 
 interface PrepareSessionPayload {
@@ -170,6 +193,59 @@ function getStorageEpochOptions(current: number) {
 
 function formatEpochOption(value: number) {
   return `${value} epoch${value === 1 ? "" : "s"}`;
+}
+
+function deriveTaskTitle(prompt: string, agentMode: AgentMode) {
+  const compactPrompt = prompt.replace(/\s+/g, " ").trim();
+  if (compactPrompt) {
+    const clipped = compactPrompt.slice(0, 72).trim();
+    return clipped.length < compactPrompt.length ? `${clipped}...` : clipped;
+  }
+  return AGENT_OPTIONS.find((option) => option.mode === agentMode)?.label ?? "Agent BlackBox Proof";
+}
+
+function downloadFile(fileName: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportSessionReport(session: AgentSession) {
+  const report = session.trace.structuredOutput;
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    session: {
+      id: session.id,
+      title: session.title,
+      agentMode: session.agentMode,
+      ownerAddress: session.ownerAddress,
+      createdAt: session.createdAt,
+    },
+    report: report
+      ? {
+          title: `${report.agentDisplayName}: ${report.taskTitle}`,
+          summary: report.executiveSummary,
+          finalOutput: report.finalOutput,
+          findings: report.findings,
+          limitations: report.limitations,
+          nextActions: report.recommendedNextActions,
+        }
+      : {
+          finalOutput: session.trace.finalOutput,
+        },
+    proof: {
+      walrusBlobId: session.storage.blobId,
+      traceHash: session.trace.traceHash,
+      resultHash: session.trace.resultHash,
+      suiTransactionDigest: session.proof.transactionDigest,
+      suiProofObject: session.proof.suiObjectId,
+    },
+  };
+  downloadFile(`${session.id}-agent-report.json`, JSON.stringify(payload, null, 2), "application/json");
 }
 
 function buildApiErrorMessage(payload: { message?: string; details?: string }, fallback: string) {
@@ -322,6 +398,7 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
   const [files, setFiles] = useState<DraftFile[]>([]);
   const [storageEpochs, setStorageEpochs] = useState(rerunPrefill?.storageEpochs ?? 1);
   const [storageMode, setStorageMode] = useState<StorageMode>(rerunPrefill?.storageMode ?? "deletable");
+  const [evidenceMenuOpen, setEvidenceMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [rerunning, setRerunning] = useState(false);
   const [error, setError] = useState<UserFacingError | null>(null);
@@ -330,13 +407,9 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
   const executionWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const configuredNetwork = getNetworkConfig();
   const proofContractConfigured = getSuiProofRegistryConfig().configured;
-  const completedStepCount = executionProgress.filter((step) => step.status === "done").length;
-  const activeExecutionStep = executionProgress.find(
-    (step) => step.status === "running" || step.status === "rerunning" || step.status === "error",
-  );
   const failedExecutionStep = executionProgress.find((step) => step.status === "error");
-  const executionProgressPercent = Math.round((completedStepCount / EXECUTION_STEPS.length) * 100);
-  const formReady = title.trim().length > 0 && prompt.trim().length > 0;
+  const effectiveTitle = title.trim() || deriveTaskTitle(prompt, agentMode);
+  const formReady = prompt.trim().length > 0;
   const rerunFileNames = activeRerunPrefill?.inputFiles.map((file) => file.name).filter(Boolean) ?? [];
 
   useEffect(() => {
@@ -565,7 +638,7 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
       body: JSON.stringify({
         rerunOf: activeRerunPrefill?.sourceSessionId,
         agentMode,
-        taskTitle: title,
+        taskTitle: effectiveTitle,
         taskPrompt: prompt,
         inputFiles: files,
         storageDuration: `${storageEpochs}-epochs`,
@@ -899,10 +972,6 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
 
       setError(null);
       setArtifacts(nextArtifacts);
-      if (nextArtifacts.finalizedSession) {
-        router.push(`/sessions/${nextArtifacts.finalizedSession.id}`);
-        router.refresh();
-      }
     } catch (requestError) {
       markExecutionFailure(currentStep);
       const diagnosticError =
@@ -954,290 +1023,389 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
     await executeFromStep(failedExecutionStep.id as ExecutionStepId, artifacts, "rerun");
   }
 
-  return (
-    <form onSubmit={runSession} className="space-y-8">
-      <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)]">
-        <div className="min-w-0 space-y-6">
-          <div>
-            <p className="eyebrow">Use Agent</p>
-            <h1 className="mt-2 text-3xl font-light tracking-tight text-white sm:text-4xl">
-              Use an agent
-            </h1>
-            <p className="muted mt-2 max-w-3xl text-zinc-500">
-              Choose an agent, give it a task, and Agent BlackBox will create the proof trail automatically.
-              Analyze Sui wallets, token holdings, objects, packages, and transactions with a sealed Agent BlackBox trace.
-            </p>
-          </div>
+  async function copyProofLink(sessionId: string) {
+    const origin = typeof window === "undefined" ? "" : window.location.origin;
+    await navigator.clipboard?.writeText(`${origin}/verify/${sessionId}`);
+  }
 
-          {(activeRerunPrefill || rerunLoadError || rerunLoading) && (
-            <div
-              className={`relative overflow-hidden rounded-2xl border p-4 ${
-                activeRerunPrefill
-                  ? "border-cyan/15 bg-cyan/[0.035]"
-                  : "border-amber-200/15 bg-amber-300/[0.055]"
-              }`}
-            >
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/45 to-transparent" />
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <p className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-cyan-200">
-                    {activeRerunPrefill
-                      ? "Re-running previous session"
-                      : rerunLoading
-                        ? "Loading re-run prefill"
-                        : "Re-run prefill unavailable"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300 [overflow-wrap:anywhere]">
-                    {activeRerunPrefill
-                      ? `This form was prefilled from session ${activeRerunPrefill.sourceSessionId}. Review or edit before running.`
-                      : rerunLoading
-                        ? "Checking the connected wallet before loading the previous session."
-                        : rerunLoadError}
-                  </p>
-                  {activeRerunPrefill && rerunFileNames.length > 0 && (
-                    <p className="mt-2 text-xs leading-5 text-amber-100/80 [overflow-wrap:anywhere]">
-                      Original file evidence cannot be automatically reattached. Upload files again if needed.
-                      Previously recorded metadata: {rerunFileNames.slice(0, 3).join(", ")}
-                      {rerunFileNames.length > 3 ? `, +${rerunFileNames.length - 3} more` : ""}.
-                    </p>
-                  )}
+  const selectedAgent = AGENT_OPTIONS.find((option) => option.mode === agentMode) ?? AGENT_OPTIONS[1];
+  const finalizedSession = artifacts.finalizedSession;
+  const finalizedReport = finalizedSession?.trace.structuredOutput;
+  const hasExecutionStarted =
+    executionProgress.some((step) => step.status !== "pending") || Boolean(error) || Boolean(finalizedSession);
+  const proofAnchored =
+    finalizedSession?.proof.status === "verified" ||
+    finalizedSession?.proof.status === "anchored" ||
+    finalizedSession?.proof.status === "anchored_pending_object";
+  const reportFindings = finalizedReport?.findings.slice(0, 4) ?? [];
+  const reportLimitations = finalizedReport?.limitations.slice(0, 3) ?? [];
+  const reportNextActions = finalizedReport?.recommendedNextActions.slice(0, 3) ?? [];
+
+  return (
+    <form onSubmit={runSession} className="mx-auto max-w-5xl space-y-6">
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/[0.08] bg-[#06060a]/88 p-5 shadow-[0_32px_120px_-78px_rgba(99,102,241,0.9)] sm:p-8">
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
+        <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 left-1/4 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" />
+
+        <div className="relative mx-auto max-w-3xl text-center">
+          <p className="font-mono text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-cyan-200">
+            AI Proof Workspace
+          </p>
+          <h1 className="mt-4 text-4xl font-light tracking-tight text-white sm:text-5xl">
+            Agent BlackBox
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-zinc-400 sm:text-base">
+            Run an AI task and create a verifiable proof trail on Walrus and Sui.
+          </p>
+        </div>
+
+        <div className="relative mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {AGENT_OPTIONS.map((option) => {
+            const selected = option.mode === agentMode;
+            return (
+              <button
+                className={`rounded-2xl border p-4 text-left transition ${
+                  selected
+                    ? "border-cyan-300/35 bg-cyan-300/[0.075] shadow-[0_0_36px_-24px_rgba(103,232,249,0.9)]"
+                    : "border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045]"
+                }`}
+                key={option.mode}
+                onClick={() => setAgentMode(option.mode)}
+                type="button"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-white">{option.label}</p>
+                  {selected && <StatusBadge status="Selected" size="sm" />}
                 </div>
-                {activeRerunPrefill && (
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    <button type="button" className="button-secondary w-full sm:w-auto" onClick={clearRerunPrefill}>
-                      Clear prefill
-                    </button>
-                    <Link href={`/sessions/${activeRerunPrefill.sourceSessionId}`} className="button-secondary w-full sm:w-auto">
-                      View original session
-                    </Link>
-                  </div>
+                <p className="mt-2 text-xs leading-5 text-zinc-500">{option.description}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        {(activeRerunPrefill || rerunLoadError || rerunLoading) && (
+          <div
+            className={`relative mt-6 overflow-hidden rounded-2xl border p-4 ${
+              activeRerunPrefill
+                ? "border-cyan/15 bg-cyan/[0.035]"
+                : "border-amber-200/15 bg-amber-300/[0.055]"
+            }`}
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <p className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                  {activeRerunPrefill
+                    ? "Re-running previous session"
+                    : rerunLoading
+                      ? "Loading re-run"
+                      : "Re-run unavailable"}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-300 [overflow-wrap:anywhere]">
+                  {activeRerunPrefill
+                    ? `This workspace was prefilled from session ${activeRerunPrefill.sourceSessionId}.`
+                    : rerunLoading
+                      ? "Checking the connected wallet before loading the previous session."
+                      : rerunLoadError}
+                </p>
+                {activeRerunPrefill && rerunFileNames.length > 0 && (
+                  <p className="mt-2 text-xs leading-5 text-amber-100/80 [overflow-wrap:anywhere]">
+                    Reattach files if needed. Previous evidence metadata: {rerunFileNames.slice(0, 3).join(", ")}
+                    {rerunFileNames.length > 3 ? `, +${rerunFileNames.length - 3} more` : ""}.
+                  </p>
                 )}
               </div>
+              {activeRerunPrefill && (
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button type="button" className="button-secondary w-full sm:w-auto" onClick={clearRerunPrefill}>
+                    Clear prefill
+                  </button>
+                  <Link href={`/sessions/${activeRerunPrefill.sourceSessionId}`} className="button-secondary w-full sm:w-auto">
+                    View original
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="relative mt-6 rounded-[1.6rem] border border-white/10 bg-black/35 p-3">
+          <textarea
+            required
+            rows={5}
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder="What do you want to prove?"
+            className="min-h-40 w-full resize-none rounded-[1.25rem] border border-transparent bg-transparent px-4 py-4 text-base leading-7 text-white placeholder:text-zinc-600 outline-none transition focus:border-white/[0.08] sm:px-5"
+          />
+
+          {files.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-2 pb-3">
+              {files.map((file, index) => (
+                <span
+                  className="inline-flex max-w-full items-center gap-2 rounded-full border border-cyan/15 bg-cyan/[0.045] px-3 py-1.5 text-xs text-cyan"
+                  key={`${file.name}-${index}`}
+                >
+                  <span className="max-w-[14rem] truncate">{file.name}</span>
+                  <button
+                    aria-label={`Remove ${file.name}`}
+                    className="text-cyan/70 transition hover:text-white"
+                    onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    type="button"
+                  >
+                    <iconify-icon icon="solar:close-circle-line-duotone" />
+                  </button>
+                </span>
+              ))}
             </div>
           )}
 
-          <GlassCard className="p-5 sm:p-8">
-            <div>
-              <p className="mb-2 font-mono text-xs uppercase tracking-widest text-indigo-400">Agent Task</p>
-              <h2 className="text-xl font-medium tracking-tight text-white">Session brief</h2>
-              <p className="mt-2 text-sm font-light text-zinc-400">
-                Define the task the agent will execute, seal, store, and verify.
-              </p>
-            </div>
-            <div className="mt-8 space-y-6">
-              <label className="block">
-                <span className="mb-3 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-                  Task title
+          <div className="relative flex flex-col gap-3 border-t border-white/[0.08] px-2 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                aria-expanded={evidenceMenuOpen}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-zinc-300 transition hover:border-cyan/25 hover:bg-cyan/[0.065] hover:text-cyan"
+                onClick={() => setEvidenceMenuOpen((open) => !open)}
+                type="button"
+              >
+                <iconify-icon icon="solar:add-circle-line-duotone" className="text-xl" />
+              </button>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-xs text-zinc-300">
+                <iconify-icon icon="solar:stars-line-duotone" className="text-base text-cyan" />
+                {selectedAgent.label}
+              </span>
+              {walletAccount ? (
+                <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-xs text-zinc-400">
+                  <ProtocolLogo protocol="sui" size="sm" />
+                  {shortenSuiAddress(walletAccount.address)} / {getNetworkConfig(walletNetwork).displayNetwork}
                 </span>
-                <input
-                  required
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Research Walrus trace storage"
-                  className="w-full rounded-xl border border-white/10 bg-[#050507] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-3 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-                  Agent instruction / task prompt
-                </span>
-                <textarea
-                  required
-                  rows={4}
-                  value={prompt}
-                  onChange={(event) => setPrompt(event.target.value)}
-                  placeholder="Explain how Walrus can store sealed Agent BlackBox traces, support readback verification, and preserve evidence for independent replay."
-                  className="min-h-36 w-full resize-y rounded-xl border border-white/10 bg-[#050507] px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
-                />
-              </label>
-              <div>
-                <span className="mb-3 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-                  Agent mode
-                </span>
-                <AgentModeSelector value={agentMode} onChange={setAgentMode} />
-              </div>
-              <div>
-                <span className="mb-3 block text-xs font-medium uppercase tracking-wide text-zinc-400">
-                  Optional file evidence
-                </span>
-                <FileDropzone files={files} onChange={setFiles} />
-              </div>
-            </div>
-          </GlassCard>
-
-          <div className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-[#08080d]/85 p-4 shadow-[0_24px_80px_-55px_rgba(99,102,241,0.7)] sm:flex sm:items-center sm:justify-between sm:gap-5 sm:p-5">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
-            <div>
-              <p className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.2em] text-cyan-200">
-                Trace capture
-              </p>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">
-                {formReady
-                  ? "Run Agent will record the execution path, seal evidence, and start the Walrus Mainnet storage flow."
-                  : "Complete the task title and instruction to enable trace capture."}
-              </p>
+              ) : (
+                <WalletConnectButton />
+              )}
             </div>
             <button
               type="submit"
               disabled={submitting || rerunning || !formReady}
-              className="group mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-4 text-sm font-semibold text-zinc-950 transition-all hover:bg-indigo-100 hover:shadow-[0_0_34px_-10px_rgba(255,255,255,0.75)] disabled:cursor-not-allowed disabled:bg-white/[0.08] disabled:text-zinc-500 disabled:shadow-none sm:mt-0 sm:w-auto sm:min-w-44"
+              className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-zinc-950 transition-all hover:bg-indigo-100 hover:shadow-[0_0_34px_-10px_rgba(255,255,255,0.75)] disabled:cursor-not-allowed disabled:bg-white/[0.08] disabled:text-zinc-500 disabled:shadow-none sm:w-auto sm:min-w-40"
             >
               <iconify-icon
                 icon={submitting ? "solar:spinner-linear" : "solar:play-circle-line-duotone"}
                 className={`text-lg transition-transform ${submitting ? "animate-spin" : "group-hover:scale-110"}`}
               />
-              Run Agent
+              {submitting || rerunning ? "Running..." : "Run Agent"}
             </button>
           </div>
-        </div>
 
-        <aside className="space-y-6">
-          <GlassCard className="p-5 sm:p-6">
-            <p className="mb-4 font-mono text-xs uppercase tracking-widest text-indigo-400">Storage Policy</p>
-            <p className="mb-4 text-xs leading-5 text-zinc-400">
-              Your wallet will pay a small Walrus storage + Sui gas fee. Keep a small SUI/WAL balance
-              available for storage and gas.
-            </p>
-            <div className="space-y-5">
-              <label className="block">
-                <span className="mb-2 block text-xs font-medium tracking-wide text-zinc-400">Storage duration</span>
-                <select
-                  className="w-full rounded-xl border border-white/10 bg-[#050507] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500/50"
-                  value={storageEpochs}
-                  onChange={(event) => setStorageEpochs(Number(event.target.value))}
-                >
-                  {getStorageEpochOptions(storageEpochs).map((epochs) => (
-                    <option value={epochs} key={epochs}>
-                      {formatEpochOption(epochs)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-xs font-medium tracking-wide text-zinc-400">Storage mode</span>
-                <select
-                  className="w-full rounded-xl border border-white/10 bg-[#050507] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500/50"
-                  value={storageMode}
-                  onChange={(event) => setStorageMode(event.target.value as StorageMode)}
-                >
-                  <option value="deletable">Deletable</option>
-                  <option value="permanent">Permanent</option>
-                </select>
-              </label>
-            </div>
-          </GlassCard>
-
-          <GlassCard className="group relative overflow-hidden border-indigo-500/20 bg-gradient-to-b from-indigo-500/5 to-transparent p-5 sm:p-6">
-            <div className="pointer-events-none absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-[0.03]" />
-
-            <div className="relative mb-5 flex items-center gap-2 text-indigo-400">
-              <iconify-icon icon="solar:shield-check-bold-duotone" className="text-lg" />
-              <p className="text-xs font-semibold uppercase tracking-[0.14em]">BlackBox Preview</p>
-            </div>
-
-            <div className="relative rounded-2xl border border-white/[0.08] bg-black/20 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-white">
-                    {activeExecutionStep?.label ?? (completedStepCount === EXECUTION_STEPS.length ? "Trace sealed" : "Trace ready")}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-zinc-500">
-                    {activeExecutionStep?.status === "error"
-                      ? "Execution is paused at the highlighted step."
-                      : "The forensic timeline updates in the execution workspace below."}
-                  </p>
-                </div>
-                  <span className="w-fit shrink-0 rounded-full border border-cyan-300/20 bg-cyan-300/[0.08] px-2.5 py-1 font-mono text-[0.58rem] uppercase tracking-[0.14em] text-cyan-100">
-                  {completedStepCount}/{EXECUTION_STEPS.length}
-                </span>
+          {evidenceMenuOpen && (
+            <div className="absolute left-3 right-3 top-[calc(100%+0.75rem)] z-20 rounded-[1.35rem] border border-white/[0.09] bg-[#09090f]/98 p-4 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:left-3 sm:right-auto sm:w-[28rem]">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {["Add files or photos", "Add screenshot", "Add link/reference", "Add notes"].map((item) => (
+                  <button
+                    className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2 text-left text-xs text-zinc-300 transition hover:border-cyan/20 hover:bg-cyan/[0.045] hover:text-white"
+                    key={item}
+                    type="button"
+                  >
+                    {item}
+                  </button>
+                ))}
               </div>
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                <span
-                  className="block h-full rounded-full bg-gradient-to-r from-indigo-400 via-cyan-300 to-emerald-300 transition-all duration-500"
-                  style={{ width: `${executionProgressPercent}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="relative mt-4 grid gap-2">
-              {[
-                { label: "Trace bundle", value: executionProgress.some((step) => step.id === "sealing" && step.status === "done") ? "Sealed" : "Pending" },
-                { label: "Walrus Mainnet", value: executionProgress.some((step) => step.id === "uploading" && step.status === "error") ? "Action Needed" : "Ready", protocol: "walrus" as Protocol },
-                { label: "Sui proof", value: proofContractConfigured ? "Configured" : "Contract Pending", protocol: "sui" as Protocol },
-              ].map(({ label, protocol, value }) => (
-                <div className="flex flex-col gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 sm:flex-row sm:items-center sm:justify-between" key={label}>
-                  <span className="inline-flex min-w-0 items-center gap-2 text-xs text-zinc-400">
-                    {protocol && <ProtocolLogo protocol={protocol} size="sm" />}
-                    {label}
-                  </span>
-                  <StatusBadge status={value} size="sm" />
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 flex items-start gap-3 border-t border-white/[0.08] pt-4">
-              <iconify-icon icon="solar:lock-keyhole-bold-duotone" className="mt-0.5 shrink-0 text-lg text-amber-200/80" />
-              <p className="text-[0.7rem] leading-relaxed text-zinc-400">
-                Walrus blobs are public by default. Encrypt sensitive traces before production upload.
-              </p>
-            </div>
-          </GlassCard>
-
-          <div
-            id="agent-wallet-requirement"
-            className="rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.04] p-4"
-          >
-            {walletAccount ? (
-              <div className="flex items-center gap-3">
-                <ProtocolLogo protocol="sui" size="md" />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-white">Session owner connected</p>
-                  <p className="mt-1 font-mono text-[0.68rem] text-zinc-400 [overflow-wrap:anywhere]">
-                    {shortenSuiAddress(walletAccount.address)} / {getNetworkConfig(walletNetwork).displayNetwork}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <p className="mb-3 text-xs leading-relaxed text-zinc-300">
-                  Connect wallet to store trace on Walrus Mainnet.
-                </p>
-                <WalletConnectButton fullWidth />
-              </div>
-            )}
-          </div>
-
-          {!proofContractConfigured && (
-            <div className="relative overflow-hidden rounded-2xl border border-amber-200/15 bg-amber-300/[0.055] p-4">
-              <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-amber-200/60 to-transparent" />
-              <div className="flex gap-3">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-amber-200/15 bg-amber-200/[0.08] text-amber-200">
-                  <iconify-icon icon="solar:shield-warning-line-duotone" className="text-lg" />
-                </span>
-                <p className="text-xs leading-5 text-amber-50/80">
-                  Proof contract not configured. Walrus storage can be created first; Sui proof
-                  anchoring stays disabled until the Mainnet package ID is set.
-                </p>
+              <div className="mt-3">
+                <FileDropzone files={files} onChange={setFiles} />
               </div>
             </div>
           )}
-        </aside>
+        </div>
+
+        <details className="group relative mt-5">
+          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.02] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 transition hover:border-white/[0.13] hover:bg-white/[0.04] [&::-webkit-details-marker]:hidden">
+            <iconify-icon icon="solar:alt-arrow-right-line-duotone" className="text-base transition group-open:rotate-90" />
+            Advanced proof settings
+            <span className="ml-auto hidden text-[0.62rem] font-normal normal-case tracking-normal text-zinc-600 sm:inline">
+              Sui Mainnet / Walrus Mainnet / {formatEpochOption(storageEpochs)}
+            </span>
+          </summary>
+          <div className="mt-3 grid gap-3 rounded-2xl border border-white/[0.07] bg-black/25 p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="block">
+              <span className="mb-2 block text-xs text-zinc-500">Storage duration</span>
+              <select
+                className="w-full rounded-xl border border-white/10 bg-[#050507] px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500/50"
+                value={storageEpochs}
+                onChange={(event) => setStorageEpochs(Number(event.target.value))}
+              >
+                {getStorageEpochOptions(storageEpochs).map((epochs) => (
+                  <option value={epochs} key={epochs}>
+                    {formatEpochOption(epochs)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-xs text-zinc-500">Storage mode</span>
+              <select
+                className="w-full rounded-xl border border-white/10 bg-[#050507] px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500/50"
+                value={storageMode}
+                onChange={(event) => setStorageMode(event.target.value as StorageMode)}
+              >
+                <option value="deletable">Deletable</option>
+                <option value="permanent">Permanent</option>
+              </select>
+            </label>
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-3">
+              <p className="text-xs text-zinc-500">Network</p>
+              <p className="mt-2 text-sm text-white">{configuredNetwork.displayNetwork}</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-3">
+              <p className="text-xs text-zinc-500">Sui anchor</p>
+              <StatusBadge status={proofContractConfigured ? "Ready" : "Needs Setup"} size="sm" />
+            </div>
+            {!proofContractConfigured && (
+              <p className="sm:col-span-2 lg:col-span-4 rounded-xl border border-amber-200/15 bg-amber-300/[0.055] px-3 py-2 text-xs leading-5 text-amber-50/80">
+                Sui anchoring is disabled until the Mainnet proof package is configured. Walrus proof storage can still run.
+              </p>
+            )}
+          </div>
+        </details>
       </section>
 
-      <div ref={executionWorkspaceRef} className="scroll-mt-24">
-        <AgentExecutionWorkspace
-          agentMode={agentMode}
-          error={error}
-          onRerunFromFailedStep={failedExecutionStep || rerunning ? rerunFromFailedStep : undefined}
-          proofConfigured={proofContractConfigured}
-          rerunning={rerunning}
-          running={submitting || rerunning}
-          steps={executionProgress}
-          storageMode={storageMode}
-          taskTitle={title}
-          walletAddress={walletAccount?.address}
-        />
-      </div>
+      {hasExecutionStarted && (
+        <section ref={executionWorkspaceRef} className="scroll-mt-24 space-y-4">
+          <div className="flex justify-end">
+            <div className="max-w-[85%] rounded-[1.35rem] rounded-br-md border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm leading-6 text-zinc-200 [overflow-wrap:anywhere]">
+              {prompt || "Run an AI task and create a proof trail."}
+            </div>
+          </div>
+          <div className="flex justify-start">
+            <div className="max-w-[92%] rounded-[1.35rem] rounded-bl-md border border-cyan/15 bg-cyan/[0.035] px-4 py-3 text-sm text-cyan">
+              Working on it...
+            </div>
+          </div>
+          <AgentExecutionWorkspace
+            agentMode={agentMode}
+            error={error}
+            onRerunFromFailedStep={failedExecutionStep || rerunning ? rerunFromFailedStep : undefined}
+            rerunning={rerunning}
+            running={submitting || rerunning}
+            steps={executionProgress}
+            taskTitle={effectiveTitle}
+          />
+        </section>
+      )}
+
+      {finalizedSession && (
+        <section className="space-y-4">
+          <GlassCard className="p-5 sm:p-7">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="font-mono text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-cyan">
+                  Agent report
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white [overflow-wrap:anywhere]">
+                  {finalizedReport ? `${finalizedReport.agentDisplayName}: ${finalizedReport.taskTitle}` : finalizedSession.title}
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400 [overflow-wrap:anywhere]">
+                  {finalizedReport?.executiveSummary ?? finalizedSession.trace.finalOutput}
+                </p>
+              </div>
+              <StatusBadge status={finalizedReport?.confidence ? `${finalizedReport.confidence} confidence` : "Completed"} />
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-white/[0.07] bg-black/25 p-4 text-sm leading-7 text-zinc-200 [overflow-wrap:anywhere]">
+              {finalizedReport?.finalOutput ?? finalizedSession.trace.finalOutput}
+            </div>
+
+            {reportFindings.length > 0 && (
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {reportFindings.map((finding) => (
+                  <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4" key={`${finding.title}-${finding.evidence}`}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-white [overflow-wrap:anywhere]">{finding.title}</p>
+                      <StatusBadge status={finding.severity} size="sm" />
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-zinc-400 [overflow-wrap:anywhere]">{finding.detail}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(reportLimitations.length > 0 || reportNextActions.length > 0) && (
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {reportLimitations.length > 0 && (
+                  <div className="rounded-2xl border border-white/[0.07] bg-white/[0.018] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Limits</p>
+                    <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-400">
+                      {reportLimitations.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {reportNextActions.length > 0 && (
+                  <div className="rounded-2xl border border-cyan/15 bg-cyan/[0.035] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan">Next steps</p>
+                    <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-300">
+                      {reportNextActions.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </GlassCard>
+
+          <GlassCard className="p-5 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="font-mono text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-cyan">
+                  {proofAnchored ? "Proof verified" : "Proof ready"}
+                </p>
+                <h3 className="mt-2 text-xl font-semibold text-white">
+                  {proofAnchored ? "Your proof is anchored on Sui." : "Your report is ready to anchor."}
+                </h3>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {[
+                    ["Trace sealed", "Passed"],
+                    [proofAnchored ? "Walrus readback" : "Stored on Walrus", finalizedSession.verification.directWalrusReadPassed ? "Passed" : "Ready"],
+                    ["Hash matched", finalizedSession.verification.hashMatched ? "Matched" : "Pending"],
+                    ["Sui anchor", proofAnchored ? "Anchored" : "Ready"],
+                  ].map(([label, status]) => (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.018] px-3 py-2" key={label}>
+                      <span className="text-xs text-zinc-500">{label}</span>
+                      <StatusBadge status={status} size="sm" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="w-full shrink-0 space-y-3 lg:w-[22rem]">
+                {proofAnchored ? (
+                  <>
+                    <Link className="button-primary w-full" href={`/verify/${finalizedSession.id}`}>
+                      Open Verification Page
+                    </Link>
+                    <button className="button-secondary w-full" onClick={() => copyProofLink(finalizedSession.id)} type="button">
+                      Copy Proof Link
+                    </button>
+                    <button className="button-secondary w-full" onClick={() => exportSessionReport(finalizedSession)} type="button">
+                      Export Report
+                    </button>
+                  </>
+                ) : (
+                  <AnchorProofPanel
+                    session={finalizedSession}
+                    onSessionUpdate={(updatedSession) =>
+                      setArtifacts((current) => ({ ...current, finalizedSession: updatedSession }))
+                    }
+                  />
+                )}
+                <Link className="button-secondary w-full" href={`/sessions/${finalizedSession.id}`}>
+                  View technical details
+                </Link>
+              </div>
+            </div>
+          </GlassCard>
+        </section>
+      )}
     </form>
   );
 }
