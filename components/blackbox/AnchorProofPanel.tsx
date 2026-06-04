@@ -6,7 +6,6 @@ import {
   useDAppKit,
 } from "@mysten/dapp-kit-react";
 import { Anchor, ExternalLink, RefreshCw, ShieldAlert } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -40,11 +39,15 @@ interface AnchorProofResponse {
   };
 }
 
-export function AnchorProofPanel({ session }: { session: AgentSession }) {
+interface AnchorProofPanelProps {
+  session: AgentSession;
+  onSessionUpdate?: (session: AgentSession) => void;
+}
+
+export function AnchorProofPanel({ onSessionUpdate, session }: AnchorProofPanelProps) {
   const account = useCurrentAccount();
   const currentNetwork = useCurrentNetwork();
   const dAppKit = useDAppKit();
-  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [rechecking, setRechecking] = useState(false);
   const [error, setError] = useState<UserFacingError | null>(null);
@@ -105,8 +108,8 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
         throw new Error(payload.message || "The proof anchor could not be persisted.");
       }
       setPersistedSession(payload.data.session);
+      onSessionUpdate?.(payload.data.session);
       setMessage(payload.message);
-      router.refresh();
     } catch (anchorError) {
       setError(normalizeUserFacingError(anchorError));
     } finally {
@@ -131,8 +134,8 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
         throw new Error(payload.message || "The Sui proof could not be rechecked.");
       }
       setPersistedSession(payload.data.session);
+      onSessionUpdate?.(payload.data.session);
       setMessage(payload.message);
-      router.refresh();
     } catch (recheckError) {
       setError(normalizeUserFacingError(recheckError));
     } finally {

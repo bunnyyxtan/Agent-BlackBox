@@ -150,8 +150,7 @@ function hydrateProofMetadata(session: AgentSession) {
     session.proof.network = getNetworkConfig().network;
   }
   if (
-    (session.proof.status as string) === "onchain_pending" ||
-    (session.proof.status === "anchored_pending_object" && !isValidSuiObjectId(session.proof.suiObjectId))
+    (session.proof.status as string) === "onchain_pending"
   ) {
     session.proof.status = "prepared";
   }
@@ -1008,7 +1007,7 @@ export async function anchorSessionProof(id: string, input: ProofAnchorInput) {
       createFunction: registry.createFunction,
       eventType: registry.eventType,
       proofMode: "onchain",
-      status: proofVerified ? "verified" : "prepared",
+      status: proofVerified ? "verified" : "anchored_pending_object",
       ...(proofVerified ? { anchoredAt: checkedAt } : {}),
     },
     tatumRpc,

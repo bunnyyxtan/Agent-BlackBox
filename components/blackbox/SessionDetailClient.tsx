@@ -26,7 +26,10 @@ import { buildSuiExplorerUrl } from "@/lib/sui-explorer";
 import { formatProofStatus } from "@/lib/tatum-rpc-labels";
 import type { AgentSession } from "@/types/blackbox";
 
-const AnchorProofPanel = dynamic<{ session: AgentSession }>(
+const AnchorProofPanel = dynamic<{
+  session: AgentSession;
+  onSessionUpdate?: (session: AgentSession) => void;
+}>(
   () =>
     import("@/components/blackbox/AnchorProofPanel")
       .then((module) => module.AnchorProofPanel)
@@ -87,7 +90,8 @@ function ProofVerificationUnavailablePanel(_props: { session?: AgentSession }) {
   );
 }
 
-export function SessionDetailClient({ session }: { session: AgentSession }) {
+export function SessionDetailClient({ session: initialSession }: { session: AgentSession }) {
+  const [session, setSession] = useState(initialSession);
   const [proofUrl, setProofUrl] = useState(`/verify/${session.id}`);
   const suiTransactionUrl = buildSuiExplorerUrl(
     "transaction",
@@ -98,6 +102,10 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
   useEffect(() => {
     setProofUrl(`${window.location.origin}/verify/${session.id}`);
   }, [session.id]);
+
+  useEffect(() => {
+    setSession(initialSession);
+  }, [initialSession]);
 
   function exportTrace() {
     const blob = new Blob([JSON.stringify(session.trace, null, 2)], { type: "application/json" });
@@ -172,7 +180,15 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
         </div>
       </div>
 
-      <AgentReportPanel session={session} anchorProofAction={<AnchorProofPanel session={session} />} />
+      <AgentReportPanel
+        session={session}
+        anchorProofAction={
+          <AnchorProofPanel
+            session={session}
+            onSessionUpdate={setSession}
+          />
+        }
+      />
 
       <div className="mt-6 rounded-[1.35rem] border border-white/[0.07] bg-white/[0.018] p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
