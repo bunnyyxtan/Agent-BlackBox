@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Clipboard, ExternalLink, FileJson, FileText, Fingerprint } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { CopyButton } from "@/components/ui/CopyButton";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -599,7 +599,13 @@ function SpecialistReportSection({ report }: { report: SpecialistAgentReport }) 
   );
 }
 
-export function AgentReportPanel({ session }: { session: AgentSession }) {
+export function AgentReportPanel({
+  session,
+  anchorProofAction,
+}: {
+  session: AgentSession;
+  anchorProofAction?: ReactNode;
+}) {
   const [copied, setCopied] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const report = session.trace.structuredOutput;
@@ -718,6 +724,12 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
           </div>
         </section>
 
+        {anchorProofAction && (
+          <section className="mt-5" aria-label="Sui proof anchor action">
+            {anchorProofAction}
+          </section>
+        )}
+
         <section className="mt-5 rounded-2xl border border-cyan/15 bg-black/20 p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
@@ -763,7 +775,7 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
         </section>
       </div>
 
-      <div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="space-y-5 p-5">
         <div className="min-w-0 space-y-5">
           {onchain && (
             <section className="min-w-0 rounded-2xl border border-cyan/15 bg-cyan/[0.025] p-4">
@@ -833,64 +845,9 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
             </div>
           </section>
 
-          <section className="min-w-0 rounded-2xl border border-white/[0.07] bg-white/[0.018] p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Tool Evidence
-                </p>
-                <h3 className="mt-1 text-base font-semibold text-white">
-                  Recorded agent action trail
-                </h3>
-              </div>
-              <StatusBadge status={`${visibleToolCalls.length} action(s)`} />
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {dataSourceSummary.map((summary) => (
-                <span
-                  key={summary}
-                  className="rounded-full border border-cyan/15 bg-cyan/[0.035] px-3 py-1 text-xs text-cyan"
-                >
-                  {summary}
-                </span>
-              ))}
-            </div>
-
-            {visibleToolCalls.length > 0 ? (
-              <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                {visibleToolCalls.map((tool) => {
-                  const presentation = getToolPresentation(tool.toolName);
-                  return (
-                    <div
-                      key={`${tool.toolName}-${tool.inputSummary}`}
-                      className="min-w-0 rounded-2xl border border-white/[0.06] bg-black/20 p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="min-w-0 text-sm font-semibold text-white [overflow-wrap:anywhere]">
-                          {presentation.action}
-                        </p>
-                        <StatusBadge status={tool.status} />
-                      </div>
-                      <p className="mt-3 text-xs leading-5 text-slate-400 [overflow-wrap:anywhere]">
-                        {presentation.detail}
-                      </p>
-                      <p className="mt-3 font-mono text-[0.62rem] uppercase tracking-[0.12em] text-slate-600 [overflow-wrap:anywhere]">
-                        Evidence ID: {humanizeToolName(tool.toolName)}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-xs leading-5 text-slate-500">
-                Tool evidence was recorded in the sealed trace. No user-facing tool actions require display here.
-              </p>
-            )}
-          </section>
         </div>
 
-        <aside className="min-w-0 space-y-5">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-3">
           <section className="min-w-0 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
               Session Snapshot
@@ -1028,7 +985,63 @@ export function AgentReportPanel({ session }: { session: AgentSession }) {
             </a>
           </section>
 
-        </aside>
+        </div>
+
+        <section className="min-w-0 rounded-2xl border border-white/[0.07] bg-white/[0.018] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Tool Evidence
+              </p>
+              <h3 className="mt-1 text-base font-semibold text-white">
+                Recorded agent action trail
+              </h3>
+            </div>
+            <StatusBadge status={`${visibleToolCalls.length} action(s)`} />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {dataSourceSummary.map((summary) => (
+              <span
+                key={summary}
+                className="rounded-full border border-cyan/15 bg-cyan/[0.035] px-3 py-1 text-xs text-cyan"
+              >
+                {summary}
+              </span>
+            ))}
+          </div>
+
+          {visibleToolCalls.length > 0 ? (
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+              {visibleToolCalls.map((tool) => {
+                const presentation = getToolPresentation(tool.toolName);
+                return (
+                  <div
+                    key={`${tool.toolName}-${tool.inputSummary}`}
+                    className="min-w-0 rounded-2xl border border-white/[0.06] bg-black/20 p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="min-w-0 text-sm font-semibold text-white [overflow-wrap:anywhere]">
+                        {presentation.action}
+                      </p>
+                      <StatusBadge status={tool.status} />
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-slate-400 [overflow-wrap:anywhere]">
+                      {presentation.detail}
+                    </p>
+                    <p className="mt-3 font-mono text-[0.62rem] uppercase tracking-[0.12em] text-slate-600 [overflow-wrap:anywhere]">
+                      Evidence ID: {humanizeToolName(tool.toolName)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-xs leading-5 text-slate-500">
+              Tool evidence was recorded in the sealed trace. No user-facing tool actions require display here.
+            </p>
+          )}
+        </section>
       </div>
 
     </GlassCard>

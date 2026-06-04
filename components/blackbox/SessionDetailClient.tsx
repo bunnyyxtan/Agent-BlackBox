@@ -171,10 +171,17 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
         </div>
       </div>
 
-      <AgentReportPanel session={session} />
+      <AgentReportPanel session={session} anchorProofAction={<AnchorProofPanel session={session} />} />
 
-      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_27rem]">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="mt-6 rounded-[1.35rem] border border-white/[0.07] bg-white/[0.018] p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="eyebrow">Detailed Proof Metadata</p>
+            <h2 className="mt-2 text-base font-semibold text-white">Sealed Trace Fingerprints</h2>
+          </div>
+          <StatusBadge status={getSessionEvidenceStatus(session)} />
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { label: "Input Hash", value: session.trace.inputHash, icon: Fingerprint },
             { label: "Trace Hash", value: session.trace.traceHash, icon: CheckCircle2 },
@@ -192,7 +199,6 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
             </GlassCard>
           ))}
         </div>
-        <AnchorProofPanel session={session} />
       </div>
 
       <div className="mt-5 space-y-5">
