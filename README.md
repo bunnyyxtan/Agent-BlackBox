@@ -178,6 +178,17 @@ Vercel deployments do not include local `.data` history, and serverless local fi
 keep the public dashboard useful, a fresh deployment shows curated sample traces until a real session
 is recorded in Supabase or the active store.
 
+Existing local development sessions can be imported manually after Supabase env vars are set:
+
+```bash
+npm run import:sessions -- --dry-run
+npm run import:sessions
+```
+
+The importer reads `.data/sessions.json`, scans for secret-looking strings before writing, and upserts
+rows into `agent_sessions` by session ID. Keep `.data/` and `.env.local` ignored and never commit the
+local session file or service role key.
+
 Sample traces are clearly labeled and do not claim wallet-signed Walrus or Sui proof. Production
 deployments should replace the local JSON store with durable database, KV, or object storage.
 

@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "import:sessions": "node scripts/import-local-sessions-to-supabase.mjs",
     "lint": "tsc --noEmit --incremental false",
     "typecheck": "tsc --noEmit --incremental false"
   },
