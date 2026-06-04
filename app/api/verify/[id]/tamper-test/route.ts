@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const response: ApiSuccessResponse<typeof result> = {
     ok: true,
-    message: "Tamper simulation recomputed a mismatched local result and trace hash.",
+    message: "Tamper simulation recomputed a temporary local hash mismatch. The original session was not changed.",
     data: result,
   };
   return NextResponse.json(response);

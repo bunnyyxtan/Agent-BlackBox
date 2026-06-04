@@ -22,6 +22,7 @@ export function VerifySessionClient({ session }: { session: AgentSession }) {
   const simulationTampered = Boolean(tamperResult);
   const verificationPresentation = getVerificationPresentation(liveSession);
   const verified = verificationPresentation.state === "verified";
+  const realVerificationStatus = verified ? "Still Verified" : verificationPresentation.status;
   const warning = verificationPresentation.state === "pending";
   const tamperState = verificationPresentation.state === "tampered";
   const headerClass = tamperState
@@ -149,6 +150,7 @@ export function VerifySessionClient({ session }: { session: AgentSession }) {
           loading={tamperLoading}
           error={tamperError}
           result={tamperResult}
+          realVerificationStatus={realVerificationStatus}
           onSimulate={toggleTamper}
         />
       </div>

@@ -10,14 +10,18 @@ export function TamperTestPanel({
   loading,
   error,
   result,
+  realVerificationStatus,
   onSimulate,
 }: {
   tampered: boolean;
   loading: boolean;
   error: string;
   result: TamperSimulationResult | null;
+  realVerificationStatus: string;
   onSimulate: () => void | Promise<void>;
 }) {
+  const realStatusVariant = realVerificationStatus.toLowerCase().includes("verified") ? "success" : "warning";
+
   return (
     <GlassCard
       className={`relative overflow-visible p-6 transition-all duration-500 
@@ -32,7 +36,7 @@ export function TamperTestPanel({
 
       <div className="relative z-10 flex flex-col items-start gap-5">
         <div
-          className={`shrink-0 rounded-2xl border p-3 flex items-center justify-center transition-all duration-500 ${
+          className={`flex shrink-0 items-center justify-center rounded-2xl border p-3 transition-all duration-500 ${
             tampered
               ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
               : "border-indigo-500/20 bg-indigo-500/10 text-indigo-400"
@@ -46,24 +50,67 @@ export function TamperTestPanel({
         
         <div className="min-w-0 flex-1">
           <h3 className={`text-base font-medium tracking-tight ${tampered ? "text-amber-50" : "text-white"}`}>
-            Tamper Resistance Test
+            Tamper Simulation
           </h3>
           <p className="mt-1 text-xs font-light leading-relaxed text-zinc-400 [overflow-wrap:anywhere]">
-            Run a local trace mutation without changing the sealed session or real proof status.
+            Test what would happen if the sealed trace were modified locally. This does not change the original proof.
           </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-indigo-300/15 bg-indigo-300/[0.055] px-2.5 py-1 text-[0.64rem] font-semibold uppercase tracking-[0.13em] text-indigo-100">
+              Local simulation only
+            </span>
+            {!tampered && <StatusBadge status="Not run" label="Status: Not run" variant="neutral" size="sm" />}
+          </div>
+
+          {!tampered && (
+            <p className="mt-3 text-xs leading-5 text-slate-500 [overflow-wrap:anywhere]">
+              This test intentionally mutates a temporary local copy to prove that altered evidence would fail verification.
+            </p>
+          )}
+
           {tampered && (
             <>
-              <div className="mt-3">
-                <StatusBadge status="Tampered" label="Simulation: Tamper Detected" variant="warning" size="sm" />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <StatusBadge
+                  status="Simulation Result"
+                  label="Simulation Result: Tamper Would Be Detected"
+                  variant="warning"
+                  size="sm"
+                />
+                <StatusBadge status="Original Proof: Unchanged" variant="success" size="sm" />
+                <StatusBadge
+                  status={realVerificationStatus}
+                  label={`Real Verification Status: ${realVerificationStatus}`}
+                  variant={realStatusVariant}
+                  size="sm"
+                />
               </div>
               <p className="mt-2 text-xs leading-5 text-amber-50/75 [overflow-wrap:anywhere]">
-                This is a local simulation only. The original sealed proof remains unchanged.
+                A temporary local copy was modified and its hash no longer matches the sealed proof hash. The original session and proof remain unchanged.
               </p>
               {result && (
-                <p className="mt-2 font-mono text-[0.64rem] leading-relaxed text-amber-100/80 [overflow-wrap:anywhere]">
-                  Sealed {shortHash(result.originalTraceHash, 10, 8)} / modified{" "}
-                  {shortHash(result.tamperedTraceHash, 10, 8)}
-                </p>
+                <div className="mt-3 space-y-2 rounded-xl border border-amber-200/15 bg-black/20 p-3">
+                  <div>
+                    <p className="text-[0.62rem] font-semibold uppercase tracking-[0.13em] text-amber-100/50">
+                      Original sealed hash
+                    </p>
+                    <p className="mt-1 font-mono text-[0.68rem] leading-relaxed text-amber-100/80 [overflow-wrap:anywhere]" title={result.originalTraceHash}>
+                      {result.originalTraceHash}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[0.62rem] font-semibold uppercase tracking-[0.13em] text-amber-100/50">
+                      Simulated modified hash
+                    </p>
+                    <p className="mt-1 font-mono text-[0.68rem] leading-relaxed text-amber-100/80 [overflow-wrap:anywhere]" title={result.tamperedTraceHash}>
+                      {result.tamperedTraceHash}
+                    </p>
+                  </div>
+                  <p className="text-[0.62rem] text-amber-100/45">
+                    Short view: sealed {shortHash(result.originalTraceHash, 10, 8)} / simulated{" "}
+                    {shortHash(result.tamperedTraceHash, 10, 8)}
+                  </p>
+                </div>
               )}
             </>
           )}
@@ -81,7 +128,7 @@ export function TamperTestPanel({
           disabled={loading}
         >
           <iconify-icon icon="solar:restart-line-duotone" className="text-sm" />
-          {loading ? "Recomputing..." : tampered ? "Reset Simulation" : "Simulate Tamper"}
+          {loading ? "Running simulation..." : tampered ? "Reset Simulation" : "Run Tamper Simulation"}
         </button>
       </div>
     </GlassCard>

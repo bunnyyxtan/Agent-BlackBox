@@ -29,7 +29,7 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
   const verificationPresentation = getVerificationPresentation(session);
   const hashStatus =
     verificationPresentation.state === "tampered"
-      ? "Tampered"
+      ? "Trace Mismatch"
       : verificationPresentation.state === "verified"
         ? "Matched"
         : verificationPresentation.status;

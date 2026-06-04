@@ -58,8 +58,8 @@ export function getVerificationPresentation(
   if (tampered) {
     return {
       state: "tampered" as const,
-      title: "Tampered Trace Detected",
-      status: "Tampered",
+      title: "Trace Mismatch Detected",
+      status: "Trace Mismatch",
       description:
         "Canonical replay/hash comparison confirmed that the stored payload does not match the sealed proof hash.",
     };
