@@ -3,12 +3,10 @@
 import { useCurrentAccount, useCurrentNetwork, useDAppKit } from "@mysten/dapp-kit-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 
 import { AnchorProofPanel } from "@/components/blackbox/AnchorProofPanel";
 import { AgentExecutionWorkspace } from "@/components/blackbox/AgentExecutionWorkspace";
-import { FileDropzone } from "@/components/blackbox/FileDropzone";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { WalletConnectButton } from "@/components/ui/WalletConnectButton";
@@ -57,20 +55,19 @@ type ExecutionStepId =
   | "saving";
 
 const EXECUTION_STEPS: Array<{ id: ExecutionStepId; label: string; detail: string }> = [
-  { id: "reading", label: "Reading task", detail: "Understanding your prompt and attached evidence." },
-  { id: "planning", label: "Planning the answer", detail: "Choosing the right agent path for this task." },
-  { id: "tools", label: "Checking data", detail: "Using available Sui, evidence, and report context." },
-  { id: "report", label: "Generating report", detail: "Writing the answer that will be sealed into the proof." },
-  { id: "sealing", label: "Sealing proof trace", detail: "Locking the task, result, and proof trace hashes." },
+  { id: "reading", label: "Reading your request", detail: "Understood the prompt and evidence" },
+  { id: "planning", label: "Planning the answer", detail: "Selected the right agent mode" },
+  { id: "tools", label: "Checking available data", detail: "Checked Sui and task context" },
+  { id: "report", label: "Preparing the answer", detail: "Created the agent report" },
+  { id: "sealing", label: "Sealing the proof trace", detail: "Sealed the trace" },
   {
     id: "uploading",
-    label: "Storing proof trace on Walrus",
-    detail:
-      "Your wallet may ask for approval to register and certify the stored trace.",
+    label: "Storing the trace on Walrus",
+    detail: "Stored on Walrus",
   },
-  { id: "reading_back", label: "Verifying Walrus readback", detail: "Reading the stored proof trace back from Walrus." },
-  { id: "verifying", label: "Checking hash match", detail: "Confirming the stored trace matches the sealed proof." },
-  { id: "saving", label: "Preparing Sui anchor", detail: "Saving the proof so you can anchor it on Sui." },
+  { id: "reading_back", label: "Verifying Walrus readback", detail: "Verified readback" },
+  { id: "verifying", label: "Checking the sealed proof", detail: "Matched the sealed proof" },
+  { id: "saving", label: "Proof is ready", detail: "Prepared Sui anchor" },
 ];
 
 const AGENT_OPTIONS: Array<{ mode: AgentMode; label: string; description: string }> = [
@@ -399,12 +396,16 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
   const [storageEpochs, setStorageEpochs] = useState(rerunPrefill?.storageEpochs ?? 1);
   const [storageMode, setStorageMode] = useState<StorageMode>(rerunPrefill?.storageMode ?? "deletable");
   const [evidenceMenuOpen, setEvidenceMenuOpen] = useState(false);
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
+  const [submittedPrompt, setSubmittedPrompt] = useState("");
+  const [anchorMessages, setAnchorMessages] = useState<Array<{ id: string; message: string; tone: "pending" | "success" | "error" }>>([]);
   const [submitting, setSubmitting] = useState(false);
   const [rerunning, setRerunning] = useState(false);
   const [error, setError] = useState<UserFacingError | null>(null);
   const [artifacts, setArtifacts] = useState<ExecutionArtifacts>({});
   const [executionProgress, setExecutionProgress] = useState(initialExecutionProgress);
   const executionWorkspaceRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const configuredNetwork = getNetworkConfig();
   const proofContractConfigured = getSuiProofRegistryConfig().configured;
   const failedExecutionStep = executionProgress.find((step) => step.status === "error");
@@ -923,6 +924,41 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
     return finalized.data.session;
   }
 
+  function handleEvidenceFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(event.target.files ?? []).map((file) => ({
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      size: file.size,
+    }));
+    if (selected.length > 0) {
+      setFiles((current) => [...current, ...selected]);
+    }
+    event.target.value = "";
+    setEvidenceMenuOpen(false);
+  }
+
+  function addTextEvidence(kind: "link" | "note") {
+    const value = window.prompt(kind === "link" ? "Paste a link or reference" : "Add a short note");
+    const trimmed = value?.trim();
+    if (!trimmed) return;
+    setFiles((current) => [
+      ...current,
+      {
+        name: trimmed.length > 72 ? `${trimmed.slice(0, 72)}...` : trimmed,
+        type: kind === "link" ? "text/uri-list" : "text/plain",
+        size: trimmed.length,
+      },
+    ]);
+    setEvidenceMenuOpen(false);
+  }
+
+  function pushAnchorMessage(message: string, tone: "pending" | "success" | "error" = "pending") {
+    setAnchorMessages((current) => [
+      ...current,
+      { id: `${Date.now()}-${current.length}`, message, tone },
+    ]);
+  }
+
   async function executeFromStep(
     startStep: ExecutionStepId,
     seedArtifacts: ExecutionArtifacts,
@@ -1004,6 +1040,10 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
     if (!validateWalletReady()) return;
     setError(null);
     setArtifacts({});
+    setSubmittedPrompt(prompt.trim());
+    setAnchorMessages([]);
+    setEvidenceMenuOpen(false);
+    setAgentMenuOpen(false);
     setExecutionProgress(initialExecutionProgress());
     setSubmitting(true);
     setRerunning(false);
@@ -1033,6 +1073,8 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
   const finalizedReport = finalizedSession?.trace.structuredOutput;
   const hasExecutionStarted =
     executionProgress.some((step) => step.status !== "pending") || Boolean(error) || Boolean(finalizedSession);
+  const hasConversation = hasExecutionStarted || Boolean(submittedPrompt);
+  const conversationPrompt = submittedPrompt || prompt.trim();
   const proofAnchored =
     finalizedSession?.proof.status === "verified" ||
     finalizedSession?.proof.status === "anchored" ||
@@ -1040,53 +1082,32 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
   const reportFindings = finalizedReport?.findings.slice(0, 4) ?? [];
   const reportLimitations = finalizedReport?.limitations.slice(0, 3) ?? [];
   const reportNextActions = finalizedReport?.recommendedNextActions.slice(0, 3) ?? [];
+  const proofDetailRows = finalizedSession
+    ? [
+        ["Input hash", finalizedSession.trace.inputHash],
+        ["Result hash", finalizedSession.trace.resultHash],
+        ["Trace hash", finalizedSession.trace.traceHash],
+        ["Walrus blob", finalizedSession.storage.blobId],
+        ["Walrus object", finalizedSession.storage.blobObjectId],
+        ["Sui transaction", finalizedSession.proof.transactionDigest],
+        ["Sui proof object", finalizedSession.proof.suiObjectId],
+      ].filter(([, value]) => Boolean(value))
+    : [];
 
   return (
-    <form onSubmit={runSession} className="mx-auto max-w-5xl space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/[0.08] bg-[#06060a]/88 p-5 shadow-[0_32px_120px_-78px_rgba(99,102,241,0.9)] sm:p-8">
-        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
-        <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 left-1/4 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" />
+    <form onSubmit={runSession} className="relative min-h-[calc(100dvh-9rem)] pb-60 sm:pb-64">
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleEvidenceFileSelection}
+      />
 
-        <div className="relative mx-auto max-w-3xl text-center">
-          <p className="font-mono text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-cyan-200">
-            AI Proof Workspace
-          </p>
-          <h1 className="mt-4 text-4xl font-light tracking-tight text-white sm:text-5xl">
-            Agent BlackBox
-          </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-zinc-400 sm:text-base">
-            Run an AI task and create a verifiable proof trail on Walrus and Sui.
-          </p>
-        </div>
-
-        <div className="relative mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {AGENT_OPTIONS.map((option) => {
-            const selected = option.mode === agentMode;
-            return (
-              <button
-                className={`rounded-2xl border p-4 text-left transition ${
-                  selected
-                    ? "border-cyan-300/35 bg-cyan-300/[0.075] shadow-[0_0_36px_-24px_rgba(103,232,249,0.9)]"
-                    : "border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045]"
-                }`}
-                key={option.mode}
-                onClick={() => setAgentMode(option.mode)}
-                type="button"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-white">{option.label}</p>
-                  {selected && <StatusBadge status="Selected" size="sm" />}
-                </div>
-                <p className="mt-2 text-xs leading-5 text-zinc-500">{option.description}</p>
-              </button>
-            );
-          })}
-        </div>
-
+      <div className="mx-auto max-w-[68rem]">
         {(activeRerunPrefill || rerunLoadError || rerunLoading) && (
           <div
-            className={`relative mt-6 overflow-hidden rounded-2xl border p-4 ${
+            className={`mb-6 overflow-hidden rounded-2xl border p-4 ${
               activeRerunPrefill
                 ? "border-cyan/15 bg-cyan/[0.035]"
                 : "border-amber-200/15 bg-amber-300/[0.055]"
@@ -1129,21 +1150,233 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
           </div>
         )}
 
-        <div className="relative mt-6 rounded-[1.6rem] border border-white/10 bg-black/35 p-3">
-          <textarea
-            required
-            rows={5}
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder="What do you want to prove?"
-            className="min-h-40 w-full resize-none rounded-[1.25rem] border border-transparent bg-transparent px-4 py-4 text-base leading-7 text-white placeholder:text-zinc-600 outline-none transition focus:border-white/[0.08] sm:px-5"
-          />
+        {!hasConversation ? (
+          <section className="flex min-h-[calc(100dvh-25rem)] flex-col items-center justify-center py-14 text-center">
+            <p className="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-cyan-200/80">
+              Agent BlackBox
+            </p>
+            <h1 className="mt-5 text-4xl font-light tracking-tight text-white sm:text-5xl">
+              What do you want to prove?
+            </h1>
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-zinc-500 sm:text-base">
+              Run an AI task and create a verifiable proof trail on Walrus and Sui.
+            </p>
+          </section>
+        ) : (
+          <section className="space-y-8 pt-3">
+            <div className="flex justify-end">
+              <div className="max-w-[44rem] rounded-[1.35rem] rounded-br-md border border-white/[0.08] bg-white/[0.055] px-4 py-3 text-sm leading-6 text-zinc-100 shadow-[0_24px_90px_-70px_rgba(0,0,0,0.9)] [overflow-wrap:anywhere]">
+                {conversationPrompt}
+              </div>
+            </div>
 
+            {hasExecutionStarted && (
+              <div ref={executionWorkspaceRef} className="flex scroll-mt-24 gap-3">
+                <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan/15 bg-cyan/[0.045] text-cyan">
+                  <iconify-icon icon="solar:shield-check-line-duotone" className="text-base" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <AgentExecutionWorkspace
+                    agentMode={agentMode}
+                    error={error}
+                    onRerunFromFailedStep={failedExecutionStep || rerunning ? rerunFromFailedStep : undefined}
+                    rerunning={rerunning}
+                    running={submitting || rerunning}
+                    steps={executionProgress}
+                  />
+                </div>
+              </div>
+            )}
+
+            {finalizedSession && (
+              <div className="flex gap-3">
+                <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan/15 bg-cyan/[0.045] text-cyan">
+                  <iconify-icon icon="solar:stars-line-duotone" className="text-base" />
+                </span>
+                <div className="min-w-0 flex-1 space-y-5">
+                  <article className="max-w-[50rem] text-sm leading-7 text-zinc-300">
+                    <p className="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan">
+                      Final answer
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white [overflow-wrap:anywhere]">
+                      {finalizedReport ? finalizedReport.taskTitle : finalizedSession.title}
+                    </h2>
+                    <p className="mt-3 text-zinc-400 [overflow-wrap:anywhere]">
+                      {finalizedReport?.executiveSummary ?? finalizedSession.trace.finalOutput}
+                    </p>
+                    <div className="mt-5 whitespace-pre-wrap text-zinc-200 [overflow-wrap:anywhere]">
+                      {finalizedReport?.finalOutput ?? finalizedSession.trace.finalOutput}
+                    </div>
+
+                    {reportFindings.length > 0 && (
+                      <div className="mt-5">
+                        <p className="font-semibold text-white">Key findings</p>
+                        <ul className="mt-2 space-y-2">
+                          {reportFindings.map((finding) => (
+                            <li key={`${finding.title}-${finding.evidence}`} className="text-zinc-400">
+                              <span className="font-medium text-zinc-100">{finding.title}:</span>{" "}
+                              {finding.detail}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {(reportLimitations.length > 0 || reportNextActions.length > 0) && (
+                      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                        {reportLimitations.length > 0 && (
+                          <div>
+                            <p className="font-semibold text-white">Limitations</p>
+                            <ul className="mt-2 space-y-1 text-zinc-500">
+                              {reportLimitations.map((item) => (
+                                <li key={item}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {reportNextActions.length > 0 && (
+                          <div>
+                            <p className="font-semibold text-white">Next steps</p>
+                            <ul className="mt-2 space-y-1 text-zinc-500">
+                              {reportNextActions.map((item) => (
+                                <li key={item}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <p className="mt-5 text-xs leading-5 text-cyan/80">
+                      Proof trace has been sealed and stored on Walrus.
+                    </p>
+                  </article>
+
+                  {anchorMessages.length > 0 && (
+                    <div className="space-y-2">
+                      {anchorMessages.map((item) => (
+                        <div className="flex items-center gap-2 text-sm text-zinc-400" key={item.id}>
+                          <span
+                            className={
+                              item.tone === "success"
+                                ? "text-emerald-200"
+                                : item.tone === "error"
+                                  ? "text-amber-200"
+                                  : "text-amber-200"
+                            }
+                          >
+                            <iconify-icon
+                              icon={
+                                item.tone === "success"
+                                  ? "solar:check-circle-bold-duotone"
+                                  : item.tone === "error"
+                                    ? "solar:danger-triangle-bold-duotone"
+                                    : "solar:spinner-linear"
+                              }
+                              className={item.tone === "pending" ? "animate-spin" : ""}
+                            />
+                          </span>
+                          {item.message}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="max-w-[48rem] rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold text-white">
+                          {proofAnchored ? "Proof anchored" : "Proof ready"}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-zinc-400">
+                          {proofAnchored
+                            ? "Your proof metadata was anchored on Sui and can be verified later."
+                            : "Your agent trace is sealed and stored on Walrus. Anchor it on Sui to create an onchain proof reference."}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {[
+                            "Trace sealed",
+                            finalizedSession.verification.directWalrusReadPassed ? "Walrus readback passed" : "Stored on Walrus",
+                            finalizedSession.verification.hashMatched ? "Hash matched" : "Hash pending",
+                            proofAnchored ? "Anchored on Sui" : "Ready for Sui anchor",
+                          ].map((item) => (
+                            <span
+                              className="rounded-full border border-white/[0.08] bg-black/20 px-2.5 py-1 text-[0.68rem] text-zinc-400"
+                              key={item}
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:min-w-48">
+                        {proofAnchored ? (
+                          <>
+                            <Link className="button-primary justify-center" href={`/verify/${finalizedSession.id}`}>
+                              Open Verification Page
+                            </Link>
+                            <button className="button-secondary justify-center" onClick={() => copyProofLink(finalizedSession.id)} type="button">
+                              Copy Proof Link
+                            </button>
+                            <button className="button-secondary justify-center" onClick={() => exportSessionReport(finalizedSession)} type="button">
+                              Export Report
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <AnchorProofPanel
+                              session={finalizedSession}
+                              variant="compact"
+                              onStatusMessage={pushAnchorMessage}
+                              onSessionUpdate={(updatedSession) =>
+                                setArtifacts((current) => ({ ...current, finalizedSession: updatedSession }))
+                              }
+                            />
+                            <Link className="button-secondary justify-center" href={`/verify/${finalizedSession.id}`}>
+                              Open Verification Page
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <details className="group mt-4 border-t border-white/[0.07] pt-3">
+                      <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.14em] text-cyan transition hover:text-white [&::-webkit-details-marker]:hidden">
+                        View proof details
+                      </summary>
+                      <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                        {proofDetailRows.map(([label, value]) => (
+                          <div className="min-w-0 rounded-xl border border-white/[0.06] bg-black/20 p-3" key={label}>
+                            <dt className="text-zinc-600">{label}</dt>
+                            <dd className="mt-1 break-all font-mono text-zinc-300">{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link className="button-secondary" href={`/sessions/${finalizedSession.id}`}>
+                          Open full session
+                        </Link>
+                        <button className="button-secondary" onClick={() => exportSessionReport(finalizedSession)} type="button">
+                          Export Report
+                        </button>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+      </div>
+
+      <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-[#050507] via-[#050507]/95 to-transparent px-4 pb-4 pt-10 lg:left-[240px]">
+        <div className="pointer-events-auto mx-auto max-w-[68rem]">
           {files.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-2 pb-3">
+            <div className="mb-2 flex flex-wrap gap-2">
               {files.map((file, index) => (
                 <span
-                  className="inline-flex max-w-full items-center gap-2 rounded-full border border-cyan/15 bg-cyan/[0.045] px-3 py-1.5 text-xs text-cyan"
+                  className="inline-flex max-w-full items-center gap-2 rounded-full border border-cyan/15 bg-cyan/[0.05] px-3 py-1.5 text-xs text-cyan backdrop-blur"
                   key={`${file.name}-${index}`}
                 >
                   <span className="max-w-[14rem] truncate">{file.name}</span>
@@ -1160,252 +1393,164 @@ export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSession
             </div>
           )}
 
-          <div className="relative flex flex-col gap-3 border-t border-white/[0.08] px-2 pt-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                aria-expanded={evidenceMenuOpen}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-zinc-300 transition hover:border-cyan/25 hover:bg-cyan/[0.065] hover:text-cyan"
-                onClick={() => setEvidenceMenuOpen((open) => !open)}
-                type="button"
-              >
-                <iconify-icon icon="solar:add-circle-line-duotone" className="text-xl" />
-              </button>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-xs text-zinc-300">
-                <iconify-icon icon="solar:stars-line-duotone" className="text-base text-cyan" />
-                {selectedAgent.label}
-              </span>
-              {walletAccount ? (
-                <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-xs text-zinc-400">
-                  <ProtocolLogo protocol="sui" size="sm" />
-                  {shortenSuiAddress(walletAccount.address)} / {getNetworkConfig(walletNetwork).displayNetwork}
-                </span>
-              ) : (
-                <WalletConnectButton />
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={submitting || rerunning || !formReady}
-              className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-zinc-950 transition-all hover:bg-indigo-100 hover:shadow-[0_0_34px_-10px_rgba(255,255,255,0.75)] disabled:cursor-not-allowed disabled:bg-white/[0.08] disabled:text-zinc-500 disabled:shadow-none sm:w-auto sm:min-w-40"
-            >
-              <iconify-icon
-                icon={submitting ? "solar:spinner-linear" : "solar:play-circle-line-duotone"}
-                className={`text-lg transition-transform ${submitting ? "animate-spin" : "group-hover:scale-110"}`}
-              />
-              {submitting || rerunning ? "Running..." : "Run Agent"}
-            </button>
-          </div>
+          <div className="relative rounded-[1.65rem] border border-white/10 bg-[#0b0a0d]/95 p-3 shadow-[0_30px_120px_-70px_rgba(0,0,0,0.95)] backdrop-blur-xl">
+            <textarea
+              required
+              rows={2}
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="What do you want to prove?"
+              className="max-h-40 min-h-16 w-full resize-none rounded-[1.25rem] border border-transparent bg-transparent px-3 py-3 text-sm leading-6 text-white placeholder:text-zinc-600 outline-none transition focus:border-white/[0.08] sm:px-4"
+            />
 
-          {evidenceMenuOpen && (
-            <div className="absolute left-3 right-3 top-[calc(100%+0.75rem)] z-20 rounded-[1.35rem] border border-white/[0.09] bg-[#09090f]/98 p-4 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:left-3 sm:right-auto sm:w-[28rem]">
-              <div className="grid gap-2 sm:grid-cols-2">
-                {["Add files or photos", "Add screenshot", "Add link/reference", "Add notes"].map((item) => (
+            <div className="flex flex-col gap-3 border-t border-white/[0.07] pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="relative">
                   <button
-                    className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2 text-left text-xs text-zinc-300 transition hover:border-cyan/20 hover:bg-cyan/[0.045] hover:text-white"
-                    key={item}
+                    aria-expanded={evidenceMenuOpen}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.035] text-zinc-300 transition hover:border-cyan/25 hover:bg-cyan/[0.065] hover:text-cyan"
+                    onClick={() => {
+                      setEvidenceMenuOpen((open) => !open);
+                      setAgentMenuOpen(false);
+                    }}
                     type="button"
                   >
-                    {item}
+                    <span className="text-xl leading-none">+</span>
                   </button>
-                ))}
-              </div>
-              <div className="mt-3">
-                <FileDropzone files={files} onChange={setFiles} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <details className="group relative mt-5">
-          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.02] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 transition hover:border-white/[0.13] hover:bg-white/[0.04] [&::-webkit-details-marker]:hidden">
-            <iconify-icon icon="solar:alt-arrow-right-line-duotone" className="text-base transition group-open:rotate-90" />
-            Advanced proof settings
-            <span className="ml-auto hidden text-[0.62rem] font-normal normal-case tracking-normal text-zinc-600 sm:inline">
-              Sui Mainnet / Walrus Mainnet / {formatEpochOption(storageEpochs)}
-            </span>
-          </summary>
-          <div className="mt-3 grid gap-3 rounded-2xl border border-white/[0.07] bg-black/25 p-4 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="block">
-              <span className="mb-2 block text-xs text-zinc-500">Storage duration</span>
-              <select
-                className="w-full rounded-xl border border-white/10 bg-[#050507] px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500/50"
-                value={storageEpochs}
-                onChange={(event) => setStorageEpochs(Number(event.target.value))}
-              >
-                {getStorageEpochOptions(storageEpochs).map((epochs) => (
-                  <option value={epochs} key={epochs}>
-                    {formatEpochOption(epochs)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-xs text-zinc-500">Storage mode</span>
-              <select
-                className="w-full rounded-xl border border-white/10 bg-[#050507] px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500/50"
-                value={storageMode}
-                onChange={(event) => setStorageMode(event.target.value as StorageMode)}
-              >
-                <option value="deletable">Deletable</option>
-                <option value="permanent">Permanent</option>
-              </select>
-            </label>
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-3">
-              <p className="text-xs text-zinc-500">Network</p>
-              <p className="mt-2 text-sm text-white">{configuredNetwork.displayNetwork}</p>
-            </div>
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-3">
-              <p className="text-xs text-zinc-500">Sui anchor</p>
-              <StatusBadge status={proofContractConfigured ? "Ready" : "Needs Setup"} size="sm" />
-            </div>
-            {!proofContractConfigured && (
-              <p className="sm:col-span-2 lg:col-span-4 rounded-xl border border-amber-200/15 bg-amber-300/[0.055] px-3 py-2 text-xs leading-5 text-amber-50/80">
-                Sui anchoring is disabled until the Mainnet proof package is configured. Walrus proof storage can still run.
-              </p>
-            )}
-          </div>
-        </details>
-      </section>
-
-      {hasExecutionStarted && (
-        <section ref={executionWorkspaceRef} className="scroll-mt-24 space-y-4">
-          <div className="flex justify-end">
-            <div className="max-w-[85%] rounded-[1.35rem] rounded-br-md border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm leading-6 text-zinc-200 [overflow-wrap:anywhere]">
-              {prompt || "Run an AI task and create a proof trail."}
-            </div>
-          </div>
-          <div className="flex justify-start">
-            <div className="max-w-[92%] rounded-[1.35rem] rounded-bl-md border border-cyan/15 bg-cyan/[0.035] px-4 py-3 text-sm text-cyan">
-              Working on it...
-            </div>
-          </div>
-          <AgentExecutionWorkspace
-            agentMode={agentMode}
-            error={error}
-            onRerunFromFailedStep={failedExecutionStep || rerunning ? rerunFromFailedStep : undefined}
-            rerunning={rerunning}
-            running={submitting || rerunning}
-            steps={executionProgress}
-            taskTitle={effectiveTitle}
-          />
-        </section>
-      )}
-
-      {finalizedSession && (
-        <section className="space-y-4">
-          <GlassCard className="p-5 sm:p-7">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="font-mono text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-cyan">
-                  Agent report
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white [overflow-wrap:anywhere]">
-                  {finalizedReport ? `${finalizedReport.agentDisplayName}: ${finalizedReport.taskTitle}` : finalizedSession.title}
-                </h2>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400 [overflow-wrap:anywhere]">
-                  {finalizedReport?.executiveSummary ?? finalizedSession.trace.finalOutput}
-                </p>
-              </div>
-              <StatusBadge status={finalizedReport?.confidence ? `${finalizedReport.confidence} confidence` : "Completed"} />
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-white/[0.07] bg-black/25 p-4 text-sm leading-7 text-zinc-200 [overflow-wrap:anywhere]">
-              {finalizedReport?.finalOutput ?? finalizedSession.trace.finalOutput}
-            </div>
-
-            {reportFindings.length > 0 && (
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
-                {reportFindings.map((finding) => (
-                  <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4" key={`${finding.title}-${finding.evidence}`}>
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <p className="text-sm font-semibold text-white [overflow-wrap:anywhere]">{finding.title}</p>
-                      <StatusBadge status={finding.severity} size="sm" />
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-zinc-400 [overflow-wrap:anywhere]">{finding.detail}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {(reportLimitations.length > 0 || reportNextActions.length > 0) && (
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
-                {reportLimitations.length > 0 && (
-                  <div className="rounded-2xl border border-white/[0.07] bg-white/[0.018] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Limits</p>
-                    <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-400">
-                      {reportLimitations.map((item) => (
-                        <li key={item}>{item}</li>
+                  {evidenceMenuOpen && (
+                    <div className="absolute bottom-[calc(100%+0.75rem)] left-0 w-[18rem] rounded-2xl border border-white/[0.09] bg-[#0c0b10]/98 p-2 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.95)] backdrop-blur-xl">
+                      {[
+                        ["Add files or photos", () => fileInputRef.current?.click()],
+                        ["Add screenshot", () => fileInputRef.current?.click()],
+                        ["Add link/reference", () => addTextEvidence("link")],
+                        ["Add notes", () => addTextEvidence("note")],
+                      ].map(([label, action]) => (
+                        <button
+                          className="block w-full rounded-xl px-3 py-2.5 text-left text-sm text-zinc-300 transition hover:bg-white/[0.055] hover:text-white"
+                          key={label as string}
+                          onClick={action as () => void}
+                          type="button"
+                        >
+                          {label as string}
+                        </button>
                       ))}
-                    </ul>
-                  </div>
-                )}
-                {reportNextActions.length > 0 && (
-                  <div className="rounded-2xl border border-cyan/15 bg-cyan/[0.035] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan">Next steps</p>
-                    <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-300">
-                      {reportNextActions.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </GlassCard>
-
-          <GlassCard className="p-5 sm:p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="font-mono text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-cyan">
-                  {proofAnchored ? "Proof verified" : "Proof ready"}
-                </p>
-                <h3 className="mt-2 text-xl font-semibold text-white">
-                  {proofAnchored ? "Your proof is anchored on Sui." : "Your report is ready to anchor."}
-                </h3>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {[
-                    ["Trace sealed", "Passed"],
-                    [proofAnchored ? "Walrus readback" : "Stored on Walrus", finalizedSession.verification.directWalrusReadPassed ? "Passed" : "Ready"],
-                    ["Hash matched", finalizedSession.verification.hashMatched ? "Matched" : "Pending"],
-                    ["Sui anchor", proofAnchored ? "Anchored" : "Ready"],
-                  ].map(([label, status]) => (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.018] px-3 py-2" key={label}>
-                      <span className="text-xs text-zinc-500">{label}</span>
-                      <StatusBadge status={status} size="sm" />
                     </div>
-                  ))}
+                  )}
                 </div>
+
+                <div className="relative">
+                  <button
+                    aria-expanded={agentMenuOpen}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 text-xs text-zinc-300 transition hover:border-cyan/25 hover:bg-cyan/[0.065] hover:text-white"
+                    onClick={() => {
+                      setAgentMenuOpen((open) => !open);
+                      setEvidenceMenuOpen(false);
+                    }}
+                    type="button"
+                  >
+                    <iconify-icon icon="solar:stars-line-duotone" className="text-base text-cyan" />
+                    {selectedAgent.label}
+                    <iconify-icon icon="solar:alt-arrow-up-line-duotone" className="text-sm text-zinc-500" />
+                  </button>
+                  {agentMenuOpen && (
+                    <div className="absolute bottom-[calc(100%+0.75rem)] left-0 w-[21rem] rounded-2xl border border-white/[0.09] bg-[#0c0b10]/98 p-2 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.95)] backdrop-blur-xl">
+                      {AGENT_OPTIONS.map((option) => (
+                        <button
+                          className={`block w-full rounded-xl px-3 py-2.5 text-left transition ${
+                            option.mode === agentMode
+                              ? "bg-cyan/[0.08] text-white"
+                              : "text-zinc-300 hover:bg-white/[0.055] hover:text-white"
+                          }`}
+                          key={option.mode}
+                          onClick={() => {
+                            setAgentMode(option.mode);
+                            setAgentMenuOpen(false);
+                          }}
+                          type="button"
+                        >
+                          <span className="block text-sm font-semibold">{option.label}</span>
+                          <span className="mt-1 block text-xs leading-5 text-zinc-500">{option.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {walletAccount ? (
+                  <span className="inline-flex min-h-10 min-w-0 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-3 text-xs text-zinc-400">
+                    <ProtocolLogo protocol="sui" size="sm" />
+                    {shortenSuiAddress(walletAccount.address)}
+                  </span>
+                ) : (
+                  <WalletConnectButton />
+                )}
               </div>
 
-              <div className="w-full shrink-0 space-y-3 lg:w-[22rem]">
-                {proofAnchored ? (
-                  <>
-                    <Link className="button-primary w-full" href={`/verify/${finalizedSession.id}`}>
-                      Open Verification Page
-                    </Link>
-                    <button className="button-secondary w-full" onClick={() => copyProofLink(finalizedSession.id)} type="button">
-                      Copy Proof Link
-                    </button>
-                    <button className="button-secondary w-full" onClick={() => exportSessionReport(finalizedSession)} type="button">
-                      Export Report
-                    </button>
-                  </>
-                ) : (
-                  <AnchorProofPanel
-                    session={finalizedSession}
-                    onSessionUpdate={(updatedSession) =>
-                      setArtifacts((current) => ({ ...current, finalizedSession: updatedSession }))
-                    }
-                  />
-                )}
-                <Link className="button-secondary w-full" href={`/sessions/${finalizedSession.id}`}>
-                  View technical details
-                </Link>
-              </div>
+              <button
+                type="submit"
+                disabled={submitting || rerunning || !formReady}
+                className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-zinc-950 transition-all hover:bg-indigo-100 hover:shadow-[0_0_34px_-10px_rgba(255,255,255,0.75)] disabled:cursor-not-allowed disabled:bg-white/[0.08] disabled:text-zinc-500 disabled:shadow-none sm:w-auto"
+              >
+                <iconify-icon
+                  icon={submitting || rerunning ? "solar:spinner-linear" : "solar:play-circle-line-duotone"}
+                  className={`text-lg transition-transform ${submitting || rerunning ? "animate-spin" : "group-hover:scale-110"}`}
+                />
+                {submitting || rerunning ? "Running" : "Run"}
+              </button>
             </div>
-          </GlassCard>
-        </section>
-      )}
+
+            <details className="group mt-3 border-t border-white/[0.07] pt-3">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-zinc-500 transition hover:text-zinc-300 [&::-webkit-details-marker]:hidden">
+                <iconify-icon icon="solar:alt-arrow-right-line-duotone" className="text-sm transition group-open:rotate-90" />
+                Advanced proof settings
+                <span className="ml-auto hidden font-normal normal-case tracking-normal text-zinc-600 sm:inline">
+                  {configuredNetwork.displayNetwork} / Walrus Mainnet / {formatEpochOption(storageEpochs)}
+                </span>
+              </summary>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="block">
+                  <span className="mb-2 block text-xs text-zinc-500">Storage duration</span>
+                  <select
+                    className="w-full rounded-xl border border-white/10 bg-[#050507] px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500/50"
+                    value={storageEpochs}
+                    onChange={(event) => setStorageEpochs(Number(event.target.value))}
+                  >
+                    {getStorageEpochOptions(storageEpochs).map((epochs) => (
+                      <option value={epochs} key={epochs}>
+                        {formatEpochOption(epochs)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs text-zinc-500">Storage mode</span>
+                  <select
+                    className="w-full rounded-xl border border-white/10 bg-[#050507] px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500/50"
+                    value={storageMode}
+                    onChange={(event) => setStorageMode(event.target.value as StorageMode)}
+                  >
+                    <option value="deletable">Deletable</option>
+                    <option value="permanent">Permanent</option>
+                  </select>
+                </label>
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-3">
+                  <p className="text-xs text-zinc-500">Network</p>
+                  <p className="mt-2 text-sm text-white">{configuredNetwork.displayNetwork}</p>
+                </div>
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] p-3">
+                  <p className="text-xs text-zinc-500">Sui anchor</p>
+                  <StatusBadge status={proofContractConfigured ? "Ready" : "Needs Setup"} size="sm" />
+                </div>
+                {!proofContractConfigured && (
+                  <p className="sm:col-span-2 lg:col-span-4 rounded-xl border border-amber-200/15 bg-amber-300/[0.055] px-3 py-2 text-xs leading-5 text-amber-50/80">
+                    Sui anchoring is disabled until the Mainnet proof package is configured. Walrus proof storage can still run.
+                  </p>
+                )}
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
     </form>
   );
 }

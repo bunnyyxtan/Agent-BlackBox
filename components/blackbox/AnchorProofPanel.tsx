@@ -42,9 +42,16 @@ interface AnchorProofResponse {
 interface AnchorProofPanelProps {
   session: AgentSession;
   onSessionUpdate?: (session: AgentSession) => void;
+  onStatusMessage?: (message: string, tone?: "pending" | "success" | "error") => void;
+  variant?: "panel" | "compact";
 }
 
-export function AnchorProofPanel({ onSessionUpdate, session }: AnchorProofPanelProps) {
+export function AnchorProofPanel({
+  onSessionUpdate,
+  onStatusMessage,
+  session,
+  variant = "panel",
+}: AnchorProofPanelProps) {
   const account = useCurrentAccount();
   const currentNetwork = useCurrentNetwork();
   const dAppKit = useDAppKit();
@@ -82,7 +89,9 @@ export function AnchorProofPanel({ onSessionUpdate, session }: AnchorProofPanelP
     setError(null);
     setMessage(null);
     try {
+      onStatusMessage?.("Preparing Sui proof transaction...", "pending");
       const transaction = buildCreateSessionProofTransaction(persistedSession);
+      onStatusMessage?.("Waiting for wallet approval...", "pending");
       const result = await dAppKit.signAndExecuteTransaction({ transaction });
       if (result.$kind !== "Transaction") {
         throw new Error("Sui did not execute the proof-anchor transaction successfully.");
@@ -110,8 +119,10 @@ export function AnchorProofPanel({ onSessionUpdate, session }: AnchorProofPanelP
       setPersistedSession(payload.data.session);
       onSessionUpdate?.(payload.data.session);
       setMessage(payload.message);
+      onStatusMessage?.("Proof anchored on Sui.", "success");
     } catch (anchorError) {
       setError(normalizeUserFacingError(anchorError));
+      onStatusMessage?.("Sui transaction was not completed.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -154,6 +165,71 @@ export function AnchorProofPanel({ onSessionUpdate, session }: AnchorProofPanelP
     prerequisiteMessage = "Connect the wallet that created this session before anchoring its proof.";
   } else if (wrongNetwork) {
     prerequisiteMessage = `Switch the connected wallet to ${getNetworkConfig(proof.network).displayNetwork}.`;
+  }
+
+  if (variant === "compact") {
+    return (
+      <div className="space-y-3">
+        {anchored ? (
+          <div className="rounded-2xl border border-emerald-300/15 bg-emerald-300/[0.045] px-4 py-3">
+            <p className="text-sm font-semibold text-emerald-100">
+              Proof anchored on Sui.
+            </p>
+            <p className="mt-1 text-xs leading-5 text-emerald-100/65">
+              The onchain reference is ready for verification.
+            </p>
+            <button
+              type="button"
+              onClick={recheckProof}
+              disabled={rechecking}
+              className="mt-3 inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${rechecking ? "animate-spin" : ""}`} />
+              {rechecking ? "Rechecking..." : "Recheck proof"}
+            </button>
+          </div>
+        ) : sampleTrace ? (
+          <button
+            type="button"
+            disabled
+            className="button-primary min-h-11 w-full justify-center disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
+          >
+            <Anchor className="h-4 w-4" />
+            Anchor Real Session Only
+          </button>
+        ) : !account ? (
+          <WalletConnectButton />
+        ) : (
+          <button
+            type="button"
+            onClick={anchorProof}
+            disabled={submitting || Boolean(prerequisiteMessage)}
+            className="button-primary min-h-11 w-full justify-center disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
+          >
+            <Anchor className="h-4 w-4" />
+            {submitting ? "Anchoring..." : retrying ? "Retry Anchor" : "Anchor on Sui"}
+          </button>
+        )}
+
+        {prerequisiteMessage && !anchored && (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] px-3 py-2">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-200/80" />
+            <p className="text-xs leading-5 text-amber-100/75">{prerequisiteMessage}</p>
+          </div>
+        )}
+        {message && <p className="text-xs leading-5 text-emerald-200/80">{message}</p>}
+        {error && (
+          <details className="group rounded-xl border border-amber-200/15 bg-amber-300/[0.04] px-3 py-2">
+            <summary className="cursor-pointer list-none text-xs font-semibold text-amber-100 [&::-webkit-details-marker]:hidden">
+              Show technical details
+            </summary>
+            <div className="mt-3">
+              <UserFacingErrorAlert error={error} />
+            </div>
+          </details>
+        )}
+      </div>
+    );
   }
 
   return (
