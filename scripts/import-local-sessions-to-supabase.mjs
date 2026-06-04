@@ -11,16 +11,12 @@ const DRY_RUN = process.argv.includes("--dry-run");
 const FILE_ARG = process.argv.find((arg) => arg.startsWith("--file="));
 const SESSIONS_PATH = FILE_ARG ? path.resolve(FILE_ARG.slice("--file=".length)) : DEFAULT_SESSIONS_PATH;
 
-const SUSPICIOUS_PATTERNS = [
-  { label: "sk-", pattern: /sk-/i },
-  { label: "private_key", pattern: /private_key/i },
-  { label: "service_role", pattern: /service_role/i },
-  { label: "SUPABASE", pattern: /SUPABASE/i },
-  { label: "OPENAI", pattern: /OPENAI/i },
-  { label: "TATUM_API_KEY", pattern: /TATUM_API_KEY/i },
-  { label: "api_key", pattern: /api_key/i },
-  { label: "secret", pattern: /secret/i },
-];
+const OPENAI_KEY_PATTERN = /\b(?:sk-proj-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,})\b/;
+const OPENAI_KEY_GLOBAL_PATTERN = /\b(?:sk-proj-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,})\b/g;
+const ENV_LABEL_PATTERN =
+  /\b[A-Z][A-Z0-9_]*(?:API_KEY|API_TOKEN|PRIVATE_KEY|SECRET|SERVICE_ROLE_KEY|BASE_URL|SUPABASE_URL)[A-Z0-9_]*\b/g;
+const PRIVATE_KEY_VALUE_PATTERN = /^0x[a-fA-F0-9]{64}$/;
+const SECRET_FIELD_NAMES = new Set(["apikey", "privatekey", "secret", "servicerole"]);
 
 function readPath(session, paths, fallback = null) {
   for (const keyPath of paths) {
@@ -174,8 +170,121 @@ function parseSessions(payload) {
   throw new Error("Expected .data/sessions.json to be an array or an object with a sessions array.");
 }
 
-function findSuspiciousPatterns(rawJson) {
-  return SUSPICIOUS_PATTERNS.filter(({ pattern }) => pattern.test(rawJson)).map(({ label }) => label);
+function normalizeSecretFieldName(key) {
+  return String(key).replace(/[-_\s]/g, "").toLowerCase();
+}
+
+function isSecretFieldName(key) {
+  return SECRET_FIELD_NAMES.has(normalizeSecretFieldName(key));
+}
+
+function isEmptyOrSafeLabelValue(value) {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return true;
+  }
+
+  if (/^(?:redacted|\[redacted\]|not configured|configuration pending|missing|none|null|undefined|n\/a)$/i.test(trimmed)) {
+    return true;
+  }
+
+  if (/^<?(?:YOUR_|REPLACE_WITH_|SET_)[A-Z0-9_ -]+>?$/i.test(trimmed)) {
+    return true;
+  }
+
+  const envLabels = trimmed.match(ENV_LABEL_PATTERN) ?? [];
+  const describesMissingConfig = /\b(?:not configured|configuration pending|missing|required|unset)\b/i.test(trimmed);
+
+  return envLabels.length > 0 && describesMissingConfig && !OPENAI_KEY_PATTERN.test(trimmed);
+}
+
+function collectEnvLabelMentions(rawJson) {
+  return Array.from(new Set(rawJson.match(ENV_LABEL_PATTERN) ?? [])).sort();
+}
+
+function findRawSecretFindings(rawJson) {
+  const findings = [];
+  const openAiKeys = rawJson.match(OPENAI_KEY_GLOBAL_PATTERN) ?? [];
+
+  if (openAiKeys.length > 0) {
+    findings.push({
+      code: "OPENAI_STYLE_KEY",
+      message: `OpenAI-style API key pattern found ${openAiKeys.length} time(s).`,
+    });
+  }
+
+  return findings;
+}
+
+function findStructuredSecretFindings(value, pathSegments = []) {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => findStructuredSecretFindings(item, [...pathSegments, `[${index}]`]));
+  }
+
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  const findings = [];
+
+  for (const [key, childValue] of Object.entries(value)) {
+    const currentPath = [...pathSegments, key];
+    const currentPathLabel = currentPath.join(".");
+
+    if (isSecretFieldName(key) && !isEmptyOrSafeLabelValue(childValue)) {
+      const normalizedKey = normalizeSecretFieldName(key);
+      const childText = typeof childValue === "string" ? childValue.trim() : "";
+      const isPrivateKeyField = normalizedKey === "privatekey";
+      const hasPrivateKeyValue = isPrivateKeyField && PRIVATE_KEY_VALUE_PATTERN.test(childText);
+
+      findings.push({
+        code: hasPrivateKeyValue ? "PRIVATE_KEY_VALUE" : "SECRET_FIELD_VALUE",
+        message: `Secret-like field "${key}" at "${currentPathLabel}" contains a non-empty value.`,
+      });
+    }
+
+    findings.push(...findStructuredSecretFindings(childValue, currentPath));
+  }
+
+  return findings;
+}
+
+function analyzeSecretSafety(rawJson, parsedJson) {
+  const blockingFindings = [...findRawSecretFindings(rawJson), ...findStructuredSecretFindings(parsedJson)];
+  const nonBlockingMentions = collectEnvLabelMentions(rawJson);
+
+  return {
+    blockingFindings,
+    nonBlockingMentions,
+  };
+}
+
+function printSecretSafetyReport({ blockingFindings, nonBlockingMentions }) {
+  if (blockingFindings.length > 0) {
+    console.error("Blocking real secret findings:");
+    for (const finding of blockingFindings) {
+      console.error(`- ${finding.code}: ${finding.message}`);
+    }
+  }
+
+  if (nonBlockingMentions.length > 0) {
+    const preview = nonBlockingMentions.slice(0, 12).join(", ");
+    const suffix = nonBlockingMentions.length > 12 ? `, and ${nonBlockingMentions.length - 12} more` : "";
+    console.log(`Non-blocking configuration label mentions: ${preview}${suffix}`);
+  }
+
+  if (blockingFindings.length === 0 && nonBlockingMentions.length > 0) {
+    console.log("Only non-secret configuration labels were found.");
+  }
 }
 
 function sanitizeErrorMessage(message) {
@@ -205,19 +314,17 @@ async function main() {
   console.log(`Reading local sessions from ${SESSIONS_PATH}`);
 
   const rawJson = await readFile(SESSIONS_PATH, "utf8");
-  const suspiciousMatches = findSuspiciousPatterns(rawJson);
+  const parsed = JSON.parse(rawJson);
+  const secretSafety = analyzeSecretSafety(rawJson, parsed);
 
-  if (suspiciousMatches.length > 0) {
-    console.error("Import stopped. The local sessions file contains suspicious secret-looking strings:");
-    for (const match of suspiciousMatches) {
-      console.error(`- ${match}`);
-    }
+  printSecretSafetyReport(secretSafety);
+
+  if (secretSafety.blockingFindings.length > 0) {
     console.error("Review and sanitize .data/sessions.json before importing it into Supabase.");
     process.exitCode = 1;
     return;
   }
 
-  const parsed = JSON.parse(rawJson);
   const sessions = parseSessions(parsed);
   const rows = [];
   let skipped = 0;
