@@ -6,6 +6,7 @@ import "@/app/globals.css";
 import { SuiWalletProvider } from "@/components/providers/SuiWalletProvider";
 import { CursorGlow } from "@/components/ui/CursorGlow";
 import { AnimatedBackground } from "@/components/ui/AnimatedBackground";
+import { Analytics } from "@vercel/analytics/next";
 
 /* ── Google Fonts via next/font ────────────────────── */
 
@@ -93,6 +94,7 @@ export default function RootLayout({
           <CursorGlow />
           <AnimatedBackground>{children}</AnimatedBackground>
         </SuiWalletProvider>
+        <Analytics />
       </body>
     </html>
   );
