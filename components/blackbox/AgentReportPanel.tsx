@@ -170,6 +170,8 @@ function buildReportJson(session: AgentSession) {
       createdAt: session.createdAt,
       ownerAddress: session.ownerAddress,
       evidenceStatus: session.status,
+      isSample: Boolean(session.isSample),
+      sampleLabel: session.sampleLabel,
     },
     report,
     specialistAnalysis: report?.specialistAnalysis,
@@ -202,6 +204,12 @@ function buildMarkdownReport(session: AgentSession) {
     "",
     `Session: ${session.id}`,
     `Title: ${session.title}`,
+    ...(session.isSample
+      ? [
+          "Sample trace: Yes",
+          "Sample boundary: This exported report is for demonstration only and is not a wallet-signed proof.",
+        ]
+      : []),
     `Agent mode: ${AGENT_MODE_LABELS[session.agentMode]}`,
     `Created: ${formatDate(session.createdAt)}`,
     `Owner wallet: ${session.ownerAddress ?? "Not recorded"}`,

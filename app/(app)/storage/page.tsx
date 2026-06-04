@@ -2,7 +2,6 @@ import { LockKeyhole } from "lucide-react";
 
 import { StorageJobCard } from "@/components/blackbox/StorageJobCard";
 import { StorageRelayStatusCard } from "@/components/blackbox/StorageRelayStatusCard";
-import { SessionStoreWarning } from "@/components/blackbox/SessionStoreWarning";
 import { WalrusVerificationPanel } from "@/components/blackbox/WalrusVerificationPanel";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
@@ -12,7 +11,7 @@ import { getWalrusConfiguration, getWalrusNetworkLabel } from "@/lib/walrus";
 export const dynamic = "force-dynamic";
 
 export default async function StoragePage() {
-  const { sessions, warning: sessionStoreWarning } = await listSessionsSafe();
+  const { sessions, sampleFallback } = await listSessionsSafe();
   const walrus = getWalrusConfiguration();
   const walrusNetworkLabel = getWalrusNetworkLabel(walrus.network);
   return (
@@ -34,10 +33,10 @@ export default async function StoragePage() {
         walrusNetworkLabel={walrusNetworkLabel}
       />
 
-      {sessionStoreWarning ? (
-        <div className="mt-6">
-          <SessionStoreWarning message={sessionStoreWarning} />
-        </div>
+      {sampleFallback ? (
+        <p className="mt-6 rounded-2xl border border-cyan/15 bg-cyan/[0.035] px-4 py-3 text-xs leading-5 text-slate-400">
+          Sample traces are shown here for public presentation. Run a real agent session to create live Walrus storage references.
+        </p>
       ) : null}
 
       <section className="mt-7">

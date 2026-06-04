@@ -209,6 +209,8 @@ export interface VerificationResult {
 
 export interface AgentSession {
   id: string;
+  isSample?: boolean;
+  sampleLabel?: string;
   rerunOf?: string;
   title: string;
   prompt: string;

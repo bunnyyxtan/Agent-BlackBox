@@ -67,6 +67,7 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
   const walrusReady =
     persistedSession.storage.storageProvider !== "local" &&
     Boolean(persistedSession.storage.blobId);
+  const sampleTrace = Boolean(persistedSession.isSample);
 
   useEffect(() => {
     setPersistedSession(session);
@@ -140,7 +141,9 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
   }
 
   let prerequisiteMessage: string | null = null;
-  if (!config.configured) {
+  if (sampleTrace) {
+    prerequisiteMessage = "Run a real agent session to anchor your own Sui proof. Sample traces are not wallet-signed.";
+  } else if (!config.configured) {
     prerequisiteMessage = "Proof contract not configured";
   } else if (!walrusReady) {
     prerequisiteMessage = "A real Walrus-backed trace blob is required before proof anchoring.";
@@ -166,6 +169,17 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
       <p className="mt-3 text-xs leading-5 text-slate-400">
         After Walrus storage is complete, anchor the final blob ID and trace hashes on Sui. This is a separate proof transaction.
       </p>
+
+      {sampleTrace ? (
+        <div className="mt-4 rounded-xl border border-cyan/15 bg-cyan/[0.045] p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan">
+            Sample Trace
+          </p>
+          <p className="mt-2 text-xs leading-5 text-slate-400">
+            This public sample shows the proof flow only. It is not stored by your wallet and cannot be anchored as your proof.
+          </p>
+        </div>
+      ) : null}
 
       {anchored ? (
         <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-3">
@@ -224,7 +238,16 @@ export function AnchorProofPanel({ session }: { session: AgentSession }) {
         </div>
       ) : (
         <div className="mt-4">
-          {!account ? (
+          {sampleTrace ? (
+            <button
+              type="button"
+              disabled
+              className="button-primary min-h-11 w-full justify-center disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <Anchor className="h-4 w-4" />
+              Anchor Real Session Only
+            </button>
+          ) : !account ? (
             <>
               <p className="mb-2 text-xs text-slate-500">Connect Wallet to anchor proof.</p>
               <WalletConnectButton fullWidth />

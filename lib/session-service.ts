@@ -13,6 +13,7 @@ import {
 import { runAgentRuntime } from "@/lib/agents/agent-runtime";
 import type { AgentRuntimeOutput } from "@/lib/agents/types";
 import { createLocalAgentSession } from "@/lib/agent-trace";
+import { getDemoSessionById, getDemoSessions } from "@/lib/demo-sessions";
 import { createHashFromString, createResultHash, createTraceHash } from "@/lib/hash";
 import { getNetworkConfig, normalizeSuiNetwork } from "@/lib/network-config";
 import { seedSessionInputs } from "@/lib/session-store";
@@ -61,6 +62,8 @@ interface SessionStoreFile {
 export interface SafeSessionListResult {
   sessions: AgentSession[];
   warning: string | null;
+  realCount: number;
+  sampleFallback: boolean;
 }
 
 interface NormalizedSessionInput extends CreateSessionInput {
@@ -588,14 +591,26 @@ export async function listSessions() {
 export async function listSessionsSafe(): Promise<SafeSessionListResult> {
   try {
     const sessions = await listSessions();
+    if (sessions.length === 0) {
+      return {
+        sessions: getDemoSessions(),
+        warning: getServerlessSessionStoreWarning(),
+        realCount: 0,
+        sampleFallback: true,
+      };
+    }
     return {
       sessions,
       warning: getServerlessSessionStoreWarning(),
+      realCount: sessions.length,
+      sampleFallback: false,
     };
   } catch (error) {
     return {
-      sessions: [],
+      sessions: getDemoSessions(),
       warning: formatSessionStoreWarning(error),
+      realCount: 0,
+      sampleFallback: true,
     };
   }
 }
@@ -607,9 +622,9 @@ export async function getSessionById(id: string) {
 
 export async function getSessionByIdSafe(id: string) {
   try {
-    return await getSessionById(id);
+    return (await getSessionById(id)) ?? getDemoSessionById(id);
   } catch {
-    return undefined;
+    return getDemoSessionById(id);
   }
 }
 
@@ -925,17 +940,23 @@ export async function hydrateSessionStore() {
 export async function getStorageReferenceByBlobId(blobId: string) {
   try {
     const sessions = await readStore();
-    return sessions.find((session) => session.storage.blobId === blobId)?.storage;
+    return (
+      sessions.find((session) => session.storage.blobId === blobId)?.storage ??
+      getDemoSessions().find((session) => session.storage.blobId === blobId)?.storage
+    );
   } catch {
-    return undefined;
+    return getDemoSessions().find((session) => session.storage.blobId === blobId)?.storage;
   }
 }
 
 export async function getStorageReferenceByUploadJobId(uploadJobId: string) {
   try {
     const sessions = await readStore();
-    return sessions.find((session) => session.storage.uploadJobId === uploadJobId)?.storage;
+    return (
+      sessions.find((session) => session.storage.uploadJobId === uploadJobId)?.storage ??
+      getDemoSessions().find((session) => session.storage.uploadJobId === uploadJobId)?.storage
+    );
   } catch {
-    return undefined;
+    return getDemoSessions().find((session) => session.storage.uploadJobId === uploadJobId)?.storage;
   }
 }

@@ -13,6 +13,11 @@ export function SessionCard({ session }: { session: AgentSession }) {
         <div className="min-w-0">
           <p className="eyebrow">{AGENT_MODE_LABELS[session.agentMode]}</p>
           <h3 className="mt-2 text-sm font-medium text-white [overflow-wrap:anywhere]">{session.title}</h3>
+          {session.isSample ? (
+            <p className="mt-2 text-[0.68rem] font-semibold uppercase tracking-[0.13em] text-cyan/80">
+              Sample Session
+            </p>
+          ) : null}
         </div>
         <StatusBadge status={getSessionEvidenceStatus(session)} />
       </div>

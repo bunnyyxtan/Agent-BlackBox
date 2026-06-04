@@ -134,6 +134,7 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <StatusBadge status={getSessionEvidenceStatus(session)} />
+              {session.isSample ? <StatusBadge status="For demonstration only" /> : null}
               <StatusBadge status={AGENT_MODE_LABELS[session.agentMode]} />
               <span className="text-xs text-slate-500">{formatDate(session.createdAt)}</span>
               {session.rerunOf && (

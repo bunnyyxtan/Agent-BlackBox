@@ -161,6 +161,15 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Deployment Session Storage
+
+Local development stores recorded sessions in `.data/sessions.json`. Vercel deployments do not include
+that local history and serverless local files are not durable. To keep the public dashboard useful, a
+fresh deployment shows curated sample traces until a real session is recorded in that deployment.
+
+Sample traces are clearly labeled and do not claim wallet-signed Walrus or Sui proof. Production
+deployments should replace the local JSON store with durable database, KV, or object storage.
+
 ## Validation
 
 ```bash

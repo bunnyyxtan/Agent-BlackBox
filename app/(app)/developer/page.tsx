@@ -3,6 +3,7 @@ import { Boxes, Database, Network, Waves } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { listSessionsSafe } from "@/lib/session-service";
 import { getUploadRelayTipConfig } from "@/lib/storage-adapters/walrus-sdk-relay";
 import { checkTatumSuiRpcReachability, getTatumSuiRpcConfig } from "@/lib/tatum-rpc";
 import { getWalrusConfiguration, getWalrusNetworkLabel } from "@/lib/walrus";
@@ -78,9 +79,10 @@ function getTatumRpcStatus(
 }
 
 export default async function DeveloperPage() {
-  const [tatumRpcReachability, walrusRelay] = await Promise.all([
+  const [tatumRpcReachability, walrusRelay, sessionState] = await Promise.all([
     checkTatumSuiRpcReachability(),
     getUploadRelayTipConfig(),
+    listSessionsSafe(),
   ]);
   const tatumRpc = getTatumSuiRpcConfig();
   const walrus = getWalrusConfiguration();
@@ -101,6 +103,19 @@ export default async function DeveloperPage() {
     ["Relay reachable", walrusRelay.reachable ? "Reachable" : "Unavailable"],
     ["Relay tip", walrusRelay.tipRequirement === "send_tip" ? "Available" : walrusRelay.tipRequirement === "no_tip" ? "Not Required" : "Unavailable"],
     ["Last check", walrusRelay.checkedAt],
+  ];
+  const sessionStorageRows = [
+    ["Storage backend", process.env.VERCEL === "1" ? "Local JSON on serverless temp storage" : "Local JSON"],
+    ["Durable on Vercel", "No"],
+    ["Real sessions loaded", String(sessionState.realCount)],
+    ["Sample fallback", sessionState.sampleFallback ? "Active" : "Inactive"],
+    [
+      "Current behavior",
+      sessionState.sampleFallback
+        ? "Dashboard shows curated sample traces until a real session is recorded."
+        : "Dashboard is showing recorded sessions from the active local store.",
+    ],
+    ["Production recommendation", "Configure durable database, KV, or object storage."],
   ];
   return (
     <>
@@ -208,6 +223,29 @@ export default async function DeveloperPage() {
       </div>
 
       <div className="mt-6 grid gap-5 xl:grid-cols-2">
+        <GlassCard className="p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-3">
+              <ProtocolLogo protocol="sui" size="md" />
+              <div>
+                <p className="eyebrow">Session Storage Diagnostics</p>
+                <h2 className="mt-1 text-base font-semibold text-white">Archive durability</h2>
+              </div>
+            </div>
+            <div className="flex shrink-0 justify-start sm:justify-end">
+              <StatusBadge status={sessionState.sampleFallback ? "Sample Fallback" : "Recording Sessions"} />
+            </div>
+          </div>
+          <dl className="mt-4 space-y-3 text-xs">
+            {sessionStorageRows.map(([label, value]) => (
+              <div className="flex flex-col gap-1 border-b border-white/[0.06] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3" key={label}>
+                <dt className="text-slate-500">{label}</dt>
+                <dd className="font-mono text-slate-300 [overflow-wrap:anywhere] sm:max-w-[70%] sm:text-right">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </GlassCard>
+
         <GlassCard className="p-5">
           <p className="eyebrow">Data Model</p>
           <h2 className="mt-2 text-base font-semibold text-white">AgentSession evidence bundle</h2>

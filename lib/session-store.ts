@@ -1,7 +1,8 @@
 import type { CreateSessionInput } from "@/types/blackbox";
 
-// These records seed the local JSON store on first run. They are not a runtime
-// fallback: unknown session IDs must remain unknown.
+// These records are legacy local seed inputs. Runtime public samples live in
+// lib/demo-sessions.ts so deployed dashboards can show clearly labeled sample traces
+// without writing to the local JSON store during page render.
 export const seedSessionInputs: CreateSessionInput[] = [
   {
     id: "abx-research-walrus",

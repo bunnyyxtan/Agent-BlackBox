@@ -134,6 +134,16 @@ export function VerifySessionClient({ session }: { session: AgentSession }) {
       </GlassCard>
 
       <div className="mt-5">
+        {liveSession.isSample ? (
+          <GlassCard className="mb-5 border-cyan/15 bg-cyan/[0.035] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan">
+              Sample Trace
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-400">
+              This verification page is using curated sample data for public presentation. It does not claim a wallet-signed Walrus or Sui proof.
+            </p>
+          </GlassCard>
+        ) : null}
         <VerificationGrid session={liveSession} />
       </div>
 

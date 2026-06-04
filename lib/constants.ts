@@ -98,6 +98,7 @@ export function formatBytes(value: number) {
 }
 
 export function getSessionEvidenceStatus(session: AgentSession) {
+  if (session.isSample) return "Sample Trace";
   if (
     session.verification.directWalrusReadPassed &&
     session.verification.hashMatched === true &&
