@@ -24,7 +24,7 @@ export function Footer() {
               <span className="font-semibold tracking-tight text-white">{APP_NAME}</span>
             </Link>
             <p className="text-sm font-light text-zinc-400 max-w-sm leading-relaxed">
-              The flight recorder for autonomous AI agents. Record, store, and verify tamper-evident traces with absolute cryptographic certainty.
+              The flight recorder for autonomous AI agents. Record, store, and verify hash-sealed traces with cryptographic certainty.
             </p>
             
             {/* Animated Status Strip */}

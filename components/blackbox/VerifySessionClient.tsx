@@ -4,44 +4,36 @@ import { CheckCircle2, RefreshCw, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 
 import { ProofDetails } from "@/components/blackbox/ProofDetails";
-import { TamperTestPanel } from "@/components/blackbox/TamperTestPanel";
 import { TraceTimeline } from "@/components/blackbox/TraceTimeline";
 import { VerificationGrid } from "@/components/blackbox/VerificationGrid";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { readJsonResponse } from "@/lib/http/safe-json";
 import { getVerificationPresentation } from "@/lib/verification-presentation";
-import type { AgentSession, TamperSimulationResult } from "@/types/blackbox";
+import type { AgentSession } from "@/types/blackbox";
 
 export function VerifySessionClient({ session }: { session: AgentSession }) {
   const [liveSession, setLiveSession] = useState(session);
   const [recheckLoading, setRecheckLoading] = useState(false);
   const [recheckError, setRecheckError] = useState("");
-  const [tamperResult, setTamperResult] = useState<TamperSimulationResult | null>(null);
-  const [tamperLoading, setTamperLoading] = useState(false);
-  const [tamperError, setTamperError] = useState("");
-  const simulationTampered = Boolean(tamperResult);
   const verificationPresentation = getVerificationPresentation(liveSession);
   const verified = verificationPresentation.state === "verified";
-  const realVerificationStatus = verified ? "Still Verified" : verificationPresentation.status;
   const warning = verificationPresentation.state === "pending";
-  const tamperState = verificationPresentation.state === "tampered";
-  const headerClass = tamperState
+  const mismatchState = verificationPresentation.state === "mismatch";
+  const headerClass = mismatchState
     ? "border-rose-300/25 bg-rose-300/[0.045]"
     : verified
       ? "border-emerald-300/20 bg-emerald-300/[0.035]"
       : "border-amber-300/20 bg-amber-300/[0.035]";
-  const iconClass = tamperState
+  const iconClass = mismatchState
     ? "border-rose-300/20 bg-rose-300/10 text-rose-200"
     : verified
       ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
       : "border-amber-300/20 bg-amber-300/10 text-amber-200";
-  const titleClass = tamperState ? "text-rose-100" : "text-white";
+  const titleClass = mismatchState ? "text-rose-100" : "text-white";
 
   async function recheckProof() {
     setRecheckLoading(true);
     setRecheckError("");
-    setTamperResult(null);
-    setTamperError("");
     try {
       const response = await fetch(`/api/verify/${liveSession.id}/recheck`, {
         method: "POST",
@@ -60,37 +52,6 @@ export function VerifySessionClient({ session }: { session: AgentSession }) {
       );
     } finally {
       setRecheckLoading(false);
-    }
-  }
-
-  async function toggleTamper() {
-    if (simulationTampered) {
-      setTamperResult(null);
-      setTamperError("");
-      return;
-    }
-    setTamperLoading(true);
-    setTamperError("");
-    try {
-      const response = await fetch(`/api/verify/${liveSession.id}/tamper-test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const payload = await readJsonResponse<{
-        data?: TamperSimulationResult;
-        message?: string;
-      }>(response, `POST /api/verify/${liveSession.id}/tamper-test`);
-      if (!response.ok || !payload.data) {
-        throw new Error(payload.message ?? "Tamper simulation could not be completed.");
-      }
-      setTamperResult(payload.data);
-    } catch (requestError) {
-      setTamperError(
-        requestError instanceof Error ? requestError.message : "Tamper simulation could not be completed.",
-      );
-    } finally {
-      setTamperLoading(false);
     }
   }
 
@@ -123,6 +84,7 @@ export function VerifySessionClient({ session }: { session: AgentSession }) {
               type="button"
               onClick={recheckProof}
               disabled={recheckLoading}
+              title="Re-read stored proof data and verify the sealed hashes."
               className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-cyan/15 bg-cyan/[0.035] px-4 text-xs font-semibold uppercase tracking-[0.13em] text-cyan transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${recheckLoading ? "animate-spin" : ""}`} />
@@ -151,18 +113,13 @@ export function VerifySessionClient({ session }: { session: AgentSession }) {
         <GlassCard className="min-w-0 p-5">
           <p className="eyebrow">Proof Bundle</p>
           <h2 className="mt-2 text-base font-semibold text-white">Proof details</h2>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Re-read stored proof data and verify Walrus readback, trace hash match, and Sui proof anchor status.
+          </p>
           <div className="mt-5">
             <ProofDetails session={liveSession} />
           </div>
         </GlassCard>
-        <TamperTestPanel
-          tampered={simulationTampered}
-          loading={tamperLoading}
-          error={tamperError}
-          result={tamperResult}
-          realVerificationStatus={realVerificationStatus}
-          onSimulate={toggleTamper}
-        />
       </div>
 
       <GlassCard className="mt-5 p-5">

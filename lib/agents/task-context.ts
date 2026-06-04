@@ -57,7 +57,7 @@ function detectQuestionType(text: string): TaskQuestionType {
   if (/\b(deliver|delivery|receipt|handoff|completed|acceptance|submission|prototype)\b/i.test(text)) {
     return "delivery_receipt";
   }
-  if (/\b(verify|proof|anchor|hash|tamper|walrus blob|trace)\b/i.test(text)) {
+  if (/\b(verify|proof|anchor|hash|walrus blob|trace)\b/i.test(text)) {
     return "proof_verification";
   }
   if (/\b(wallet|balance|holdings|token|transaction|object|package)\b/i.test(text)) {

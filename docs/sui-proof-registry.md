@@ -108,7 +108,7 @@ transaction.
 9. Select `Recheck Proof` on the detail or verification page.
 10. Confirm Tatum RPC reports `Passed` only after object, transaction, event, session ID, owner, hashes,
     and Walrus Blob ID all match.
-11. Run the tamper test and confirm the local hash mismatch remains visible.
+11. Use `Recheck Proof` and confirm Walrus readback, trace hash match, and Sui proof anchor status.
 
 Developers may opt into testnet later by setting `NEXT_PUBLIC_SUI_NETWORK=testnet`, `SUI_NETWORK=testnet`,
 and `WALRUS_NETWORK=testnet`, plus matching relay, aggregator, explorer endpoints, and a testnet

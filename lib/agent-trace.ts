@@ -593,7 +593,7 @@ export function createLocalAgentSession(input: CreateSessionInput, structuredOut
       suiProofFound: false,
       tatumRpcPassed: false,
       hashMatched: true,
-      tamperDetected: false,
+      hashMismatchDetected: false,
       checkedAt,
     },
   };

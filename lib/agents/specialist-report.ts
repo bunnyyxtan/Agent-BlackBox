@@ -362,7 +362,7 @@ function buildWalrusResearch(input: ReportInput, context: TaskContext, generated
     recommendedNextActions: [
       "Attach official Walrus docs or architecture links for a source-backed protocol brief.",
       "Run a live Agent BlackBox trace and verify Walrus readback/hash match.",
-      "Use the verification page to demonstrate replay and tamper detection.",
+      "Use the verification page to demonstrate replay, hash integrity, and Sui proof checks.",
     ],
     proofNotes: proofNotes(input),
   };
@@ -465,7 +465,7 @@ function buildRiskReview(input: ReportInput, context: TaskContext, generatedAt: 
     ["financial", /\b(cost|gas|sui|wal|payment|fund|fee|charge)\b/i, "Medium"],
     ["data quality", /\b(false|unsupported|verification|hash|trace|evidence|source|missing|incorrect)\b/i, "High"],
     ["user trust", /\b(public|demo|judge|trust|reputation|claim|confusing)\b/i, "High"],
-    ["proof integrity", /\b(anchor|proof|walrus|hash|tamper|readback|mismatch)\b/i, "Critical"],
+    ["proof integrity", /\b(anchor|proof|walrus|hash|readback|mismatch)\b/i, "Critical"],
   ] as const;
   const matched = categories.filter(([, pattern]) => pattern.test(lower));
   const active = matched.length > 0 ? matched : categories.slice(0, 4);

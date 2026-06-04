@@ -4,7 +4,7 @@ export type VerificationPresentationState =
   | "verified"
   | "pending"
   | "unavailable"
-  | "tampered";
+  | "mismatch";
 
 function hasText(value?: string | null) {
   return Boolean(value?.trim());
@@ -25,8 +25,11 @@ export function hasConfirmedHashMismatch(session: AgentSession) {
   );
 }
 
-function hasRealTamperFlag(session: AgentSession) {
-  return session.verification.tamperDetected && session.verification.hashMatched === false;
+function hasStoredMismatchFlag(session: AgentSession) {
+  return (
+    Boolean(session.verification.hashMismatchDetected || session.verification.tamperDetected) &&
+    session.verification.hashMatched === false
+  );
 }
 
 function hasRequiredHashData(session: AgentSession) {
@@ -53,11 +56,11 @@ export function getVerificationPresentation(
   const verified =
     session.verification.directWalrusReadPassed &&
     session.verification.hashMatched;
-  const tampered = hasConfirmedHashMismatch(session) || hasRealTamperFlag(session);
+  const mismatch = hasConfirmedHashMismatch(session) || hasStoredMismatchFlag(session);
 
-  if (tampered) {
+  if (mismatch) {
     return {
-      state: "tampered" as const,
+      state: "mismatch" as const,
       title: "Trace Mismatch Detected",
       status: "Trace Mismatch",
       description:

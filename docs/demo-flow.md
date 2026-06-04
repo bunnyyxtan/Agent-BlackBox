@@ -173,17 +173,17 @@ Use the export buttons to download or copy the proof:
 
 Use these exports for submissions, audits, handoff, or public proof sharing.
 
-## Step 10 — Run Tamper Simulation
+## Step 10 — Recheck Proof
 
-Use **Run Tamper Simulation** to test proof integrity.
+Use **Recheck Proof** to test proof integrity.
 
-This does not change the real session.
+Agent BlackBox re-reads stored proof data and checks:
 
-Agent BlackBox creates a temporary modified local copy and compares its hash with the sealed proof hash.
+- Walrus readback
+- Trace hash match
+- Sui proof anchor status
 
-If the hashes do not match, the page shows that tampering would be detected.
-
-The original proof remains unchanged.
+The proof remains valid only when the stored evidence and sealed hashes match.
 
 ## Recovery Notes
 
@@ -205,4 +205,4 @@ A completed Agent BlackBox session should include:
 - Trace hash match
 - Sui proof anchor status
 - Export options
-- Tamper simulation result
+- Recheck Proof result

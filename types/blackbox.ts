@@ -203,7 +203,8 @@ export interface VerificationResult {
   suiProofFound: boolean;
   tatumRpcPassed: boolean;
   hashMatched: boolean;
-  tamperDetected: boolean;
+  hashMismatchDetected: boolean;
+  tamperDetected?: boolean;
   checkedAt: string;
 }
 
@@ -285,16 +286,6 @@ export interface LocalVerificationReport {
   };
 }
 
-export interface TamperSimulationResult {
-  sessionId: string;
-  originalResultHash: string;
-  tamperedResultHash: string;
-  originalTraceHash: string;
-  tamperedTraceHash: string;
-  match: false;
-  tampered: true;
-  reason: string;
-}
 
 export interface ApiSuccessResponse<T> {
   ok: true;

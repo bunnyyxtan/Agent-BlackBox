@@ -2,7 +2,7 @@
 
 > The flight recorder for autonomous AI agents.
 
-Agent BlackBox records an AI-agent task as a tamper-evident proof bundle: the original user intent,
+Agent BlackBox records an AI-agent task as a hash-verified proof bundle: the original user intent,
 file metadata, agent plan, tool-call summaries, final report, deterministic hashes, Walrus storage
 references, Sui proof-anchor metadata, and verification results.
 
@@ -10,7 +10,7 @@ references, Sui proof-anchor metadata, and verification results.
 
 Autonomous agents can produce useful work, but a final answer alone does not prove what happened. Agent
 BlackBox records the evidence trail so a user, reviewer, or judge can inspect the input, replay the
-trace, verify storage availability, confirm the Sui proof anchor, and detect later tampering.
+trace, verify storage availability, confirm the Sui proof anchor, and confirm the sealed hashes still match.
 
 The canonical production flow is:
 
@@ -76,13 +76,13 @@ network, and timestamp. The server never signs transactions or holds wallet priv
 **Creativity**
 
 - Agent BlackBox acts as a flight recorder for AI-agent work.
-- Tamper-resistant traces prove when a final answer was changed after sealing.
+- Hash-verified traces make post-sealing changes visible during replay and proof checks.
 - Verification pages combine replay, blob availability, hash comparison, Sui anchor status, and exportable proof reports.
 
 **Presentation**
 
 - README, integration docs, and [demo flow](docs/demo-flow.md) explain the complete judge path.
-- The UI surfaces Agent Execution, Walrus storage, Sui anchoring, Tatum RPC readiness, proof export, and tamper simulation.
+- The UI surfaces Agent Execution, Walrus storage, Sui anchoring, Tatum RPC readiness, proof recheck, and proof export.
 
 ## Routes
 
@@ -93,7 +93,7 @@ network, and timestamp. The server never signs transactions or holds wallet priv
 | `/sessions` | BlackBox trace archive |
 | `/sessions/new` | Agent recording flow |
 | `/sessions/[id]` | Session detail, evidence, proof actions, and exports |
-| `/verify/[id]` | Public proof report and tamper-resistance test |
+| `/verify/[id]` | Public proof report, proof recheck, and exports |
 | `/storage` | Walrus blob status and direct verification |
 | `/settings` | Clean integration configuration posture |
 | `/developer` | Server boundaries and developer diagnostics |
@@ -107,7 +107,7 @@ See [docs/demo-flow.md](docs/demo-flow.md) for the short judge script. The core 
 3. Store the trace on Walrus Mainnet through the SDK Upload Relay.
 4. Read the Walrus blob back and verify the trace hash.
 5. Anchor the Walrus Blob ID and hashes on Sui Mainnet.
-6. Open the verification page, export evidence, and run the tamper simulation.
+6. Open the verification page, export evidence, and use Recheck Proof to verify Walrus readback, trace hash match, and Sui anchor status.
 
 ## Environment
 

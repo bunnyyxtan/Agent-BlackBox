@@ -270,7 +270,8 @@ function buildSampleSession(input: (typeof sampleInputs)[number]): AgentSession 
       suiProofFound: false,
       tatumRpcPassed: false,
       hashMatched: true,
-      tamperDetected: false,
+      hashMismatchDetected: false,
+      tamperDetected: undefined,
       checkedAt,
     },
   };

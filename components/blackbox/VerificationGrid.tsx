@@ -1,3 +1,5 @@
+import { Fingerprint } from "lucide-react";
+
 import { formatStatusLabel, StatusBadge } from "@/components/ui/StatusBadge";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -28,13 +30,13 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
   const walrusLabel = localOnly ? localTraceLabel : `Walrus ${networkLabel}`;
   const verificationPresentation = getVerificationPresentation(session);
   const hashStatus =
-    verificationPresentation.state === "tampered"
+    verificationPresentation.state === "mismatch"
       ? "Trace Mismatch"
       : verificationPresentation.state === "verified"
         ? "Matched"
         : verificationPresentation.status;
   const hashDetail =
-    verificationPresentation.state === "tampered"
+    verificationPresentation.state === "mismatch"
       ? "Canonical trace hash mismatch"
       : session.trace.traceHash;
   const expiryStatus = localOnly
@@ -74,7 +76,7 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-4">
       {items.map(({ label, status, icon, detail, protocol }, index) => {
-        const dangerStatus = ["Failed", "Tampered", "Verification Unavailable"].includes(status);
+        const dangerStatus = ["Failed", "Trace Mismatch", "Verification Unavailable"].includes(status);
         return (
           <GlassCard 
             key={label}
@@ -86,7 +88,11 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
 
             <div className="relative z-10 flex min-h-full min-w-0 flex-col">
               <div className="mb-5 flex items-start justify-between gap-3">
-                {protocol ? (
+                {label === "Hash Integrity" ? (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/[0.03] text-zinc-400 transition-transform duration-500 group-hover:scale-110 group-hover:text-indigo-400">
+                    <Fingerprint className="h-5 w-5" aria-hidden="true" />
+                  </div>
+                ) : protocol ? (
                   <ProtocolLogo
                     protocol={protocol}
                     size="lg"

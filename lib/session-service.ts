@@ -45,7 +45,6 @@ import type {
   LocalVerificationReport,
   StorageMode,
   StorageReference,
-  TamperSimulationResult,
   VerificationResult,
 } from "@/types/blackbox";
 
@@ -246,7 +245,8 @@ async function buildStoredSession(
       walrusBlobAvailable: directWalrus && storageVerification.readStatus === "available",
       directWalrusReadPassed: directWalrus && storageVerification.checked && hashMatched,
       hashMatched,
-      tamperDetected: verificationFailed,
+      hashMismatchDetected: verificationFailed,
+      tamperDetected: undefined,
       checkedAt,
     },
   } satisfies AgentSession;
@@ -678,7 +678,8 @@ export async function finalizeSessionStorage(id: string, input: FinalizeStorageI
       walrusBlobAvailable: true,
       directWalrusReadPassed: true,
       hashMatched: true,
-      tamperDetected: false,
+      hashMismatchDetected: false,
+      tamperDetected: undefined,
       checkedAt,
     },
   };
@@ -1036,7 +1037,8 @@ export async function verifySession(id: string): Promise<LocalVerificationReport
     suiProofFound: tatumRpc.objectFound === true,
     tatumRpcPassed: tatumRpc.status === "passed",
     hashMatched,
-    tamperDetected: verificationFailed,
+    hashMismatchDetected: verificationFailed,
+    tamperDetected: undefined,
     checkedAt,
   };
   const verifiedSession: AgentSession = {
@@ -1096,37 +1098,6 @@ export async function recheckSession(id: string) {
     await persistSession(report.session);
   }
   return report;
-}
-
-export async function simulateTamper(
-  id: string,
-  tamperedOutput?: string,
-): Promise<TamperSimulationResult | undefined> {
-  const session = await getSessionByIdSafe(id);
-  if (!session) return undefined;
-
-  const requestedOutput = tamperedOutput?.trim();
-  const changedOutput =
-    requestedOutput && requestedOutput !== session.trace.finalOutput
-      ? requestedOutput
-      : `${session.trace.finalOutput}\n\n[Local tamper simulation: final output changed after sealing.]`;
-  const tamperedResultHash = createResultHash(changedOutput);
-  const tamperedTraceHash = createTraceHash({
-    ...session.trace,
-    finalOutput: changedOutput,
-    resultHash: tamperedResultHash,
-  });
-
-  return {
-    sessionId: session.id,
-    originalResultHash: session.proof.resultHash,
-    tamperedResultHash,
-    originalTraceHash: session.proof.traceHash,
-    tamperedTraceHash,
-    match: false,
-    tampered: true,
-    reason: "The locally modified output recomputes to a different trace hash than the sealed proof hash.",
-  };
 }
 
 export async function hydrateSessionStore() {
