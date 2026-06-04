@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { UserFacingErrorAlert } from "@/components/ui/UserFacingErrorAlert";
-import { normalizeUserFacingError, type UserFacingError } from "@/lib/errors/user-facing-errors";
+import type { UserFacingError } from "@/lib/errors/user-facing-errors";
 
 type Wallet = ReturnType<typeof useWallets>[number];
 
@@ -14,8 +14,164 @@ interface PremiumWalletConnectModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface SupportedWalletOption {
+  id: "phantom" | "okx" | "slush";
+  name: string;
+  aliases: string[];
+  installUrl: string;
+  installLabel: string;
+}
+
+type WalletConnectStage = "connect_wallet" | "authorize_accounts";
+
+const SUPPORTED_WALLET_OPTIONS: SupportedWalletOption[] = [
+  {
+    id: "phantom",
+    name: "Phantom",
+    aliases: ["phantom", "phantom wallet"],
+    installUrl: "https://phantom.com/download",
+    installLabel: "Install Phantom",
+  },
+  {
+    id: "okx",
+    name: "OKX Wallet",
+    aliases: ["okx", "okx wallet"],
+    installUrl: "https://www.okx.com/web3",
+    installLabel: "Install OKX",
+  },
+  {
+    id: "slush",
+    name: "Slush",
+    aliases: ["slush", "slush wallet"],
+    installUrl: "https://my.slush.app",
+    installLabel: "Open Slush",
+  },
+];
+
 function walletKey(wallet: Wallet) {
   return `${wallet.name}:${wallet.icon}`;
+}
+
+function normalizeWalletName(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function walletMatchesOption(wallet: Wallet, option: SupportedWalletOption) {
+  const walletName = normalizeWalletName(wallet.name);
+  return option.aliases.some((alias) => walletName.includes(normalizeWalletName(alias)));
+}
+
+function walletOptionFor(wallet: Wallet) {
+  return SUPPORTED_WALLET_OPTIONS.find((option) => walletMatchesOption(wallet, option));
+}
+
+function isWalletDetected(wallets: Wallet[], option: SupportedWalletOption) {
+  return wallets.some((wallet) => walletMatchesOption(wallet, option));
+}
+
+function sortDetectedWallets(wallets: Wallet[]) {
+  return [...wallets].sort((left, right) => {
+    const leftOption = walletOptionFor(left);
+    const rightOption = walletOptionFor(right);
+    const leftRank = leftOption
+      ? SUPPORTED_WALLET_OPTIONS.findIndex((option) => option.id === leftOption.id)
+      : 99;
+    const rightRank = rightOption
+      ? SUPPORTED_WALLET_OPTIONS.findIndex((option) => option.id === rightOption.id)
+      : 99;
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    return left.name.localeCompare(right.name);
+  });
+}
+
+function sanitizeWalletMessage(error: unknown) {
+  const raw = error instanceof Error ? error.message : String(error || "Unknown wallet error.");
+  return raw.replace(/\s+/g, " ").trim().slice(0, 420);
+}
+
+function buildWalletError({
+  walletName,
+  stage,
+  code,
+  message,
+  detected,
+}: {
+  walletName: string;
+  stage: WalletConnectStage;
+  code: "WALLET_CANCELLED" | "WALLET_NO_ACCOUNT" | "WALLET_NOT_INSTALLED" | "WALLET_CONNECT_FAILED";
+  message: string;
+  detected: boolean;
+}): UserFacingError {
+  if (code === "WALLET_CANCELLED") {
+    return {
+      title: "Wallet connection was cancelled.",
+      lines: ["Wallet connection was cancelled."],
+      details: walletErrorDetails({ walletName, stage, code, message, detected }),
+    };
+  }
+
+  if (code === "WALLET_NO_ACCOUNT") {
+    return {
+      title: "Wallet did not return an account.",
+      lines: ["Wallet did not return an account. Please unlock the wallet and try again."],
+      details: walletErrorDetails({ walletName, stage, code, message, detected }),
+    };
+  }
+
+  if (code === "WALLET_NOT_INSTALLED") {
+    return {
+      title: "Wallet is not installed.",
+      lines: ["This wallet is not installed. Install it or choose another wallet."],
+      details: walletErrorDetails({ walletName, stage, code, message, detected }),
+    };
+  }
+
+  return {
+    title: "Wallet connection failed.",
+    lines: ["Wallet connection failed. Unlock the wallet and try again."],
+    details: walletErrorDetails({ walletName, stage, code, message, detected }),
+  };
+}
+
+function walletErrorDetails({
+  walletName,
+  stage,
+  code,
+  message,
+  detected,
+}: {
+  walletName: string;
+  stage: WalletConnectStage;
+  code: string;
+  message: string;
+  detected: boolean;
+}) {
+  return [
+    `Selected wallet: ${walletName || "not selected"}`,
+    `Detected by dApp Kit: ${detected ? "yes" : "no"}`,
+    `Stage: ${stage}`,
+    `Error code: ${code}`,
+    `Message: ${message || "not reported"}`,
+  ].join("\n");
+}
+
+function mapWalletConnectError(wallet: Wallet, error: unknown, stage: WalletConnectStage): UserFacingError {
+  const message = sanitizeWalletMessage(error);
+  const lower = message.toLowerCase();
+  const code =
+    /reject|denied|cancel|closed|dismiss/i.test(lower)
+      ? "WALLET_CANCELLED"
+      : /no accounts|account.*not|authorize|unlock/i.test(lower)
+        ? "WALLET_NO_ACCOUNT"
+        : "WALLET_CONNECT_FAILED";
+
+  return buildWalletError({
+    walletName: wallet.name,
+    stage,
+    code,
+    message,
+    detected: true,
+  });
 }
 
 export function PremiumWalletConnectModal({ open, onOpenChange }: PremiumWalletConnectModalProps) {
@@ -26,6 +182,8 @@ export function PremiumWalletConnectModal({ open, onOpenChange }: PremiumWalletC
   const [connectingWallet, setConnectingWallet] = useState("");
   const [connectedWallet, setConnectedWallet] = useState("");
   const [error, setError] = useState<UserFacingError | null>(null);
+  const detectedWallets = sortDetectedWallets(wallets);
+  const missingWalletOptions = SUPPORTED_WALLET_OPTIONS.filter((option) => !isWalletDetected(wallets, option));
 
   useEffect(() => {
     setMounted(true);
@@ -58,11 +216,21 @@ export function PremiumWalletConnectModal({ open, onOpenChange }: PremiumWalletC
     setConnectedWallet("");
     setConnectingWallet(wallet.name);
     try {
-      await dAppKit.connectWallet({ wallet });
+      const result = await dAppKit.connectWallet({ wallet });
+      if (!result.accounts.length) {
+        setError(buildWalletError({
+          walletName: wallet.name,
+          stage: "authorize_accounts",
+          code: "WALLET_NO_ACCOUNT",
+          message: "No accounts were authorized by the wallet.",
+          detected: true,
+        }));
+        return;
+      }
       setConnectedWallet(wallet.name);
       window.setTimeout(() => onOpenChange(false), 420);
     } catch (connectError) {
-      setError(normalizeUserFacingError(connectError));
+      setError(mapWalletConnectError(wallet, connectError, "connect_wallet"));
     } finally {
       setConnectingWallet("");
     }
@@ -108,51 +276,99 @@ export function PremiumWalletConnectModal({ open, onOpenChange }: PremiumWalletC
             </button>
           </div>
 
-          <div className="mt-5 space-y-2.5">
-            {wallets.length === 0 ? (
-              <div className="rounded-2xl border border-amber-200/15 bg-amber-300/[0.045] p-4">
-                <p className="text-xs font-semibold text-amber-50">Wallet not available.</p>
-                <p className="mt-1 text-xs leading-5 text-amber-50/70">
-                  Install or enable a Sui wallet extension, then refresh this page.
-                </p>
-              </div>
-            ) : (
-              wallets.map((wallet) => {
-                const connecting = connectingWallet === wallet.name;
-                const connected = connectedWallet === wallet.name || connection.wallet?.name === wallet.name && connection.isConnected;
-                return (
-                  <button
-                    type="button"
-                    onClick={() => connectWallet(wallet)}
-                    disabled={Boolean(connectingWallet)}
-                    className="group flex min-h-14 w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3 text-left transition duration-300 hover:border-indigo-300/35 hover:bg-indigo-500/[0.09] hover:shadow-[0_0_28px_-18px_rgba(99,102,241,0.8)] disabled:cursor-wait disabled:opacity-70"
-                    key={walletKey(wallet)}
+          <div className="mt-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                Detected Sui wallets
+              </p>
+              <span className="rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-emerald-200">
+                Wallet Standard
+              </span>
+            </div>
+
+            <div className="mt-3 space-y-2.5">
+              {detectedWallets.length === 0 ? (
+                <div className="rounded-2xl border border-amber-200/15 bg-amber-300/[0.045] p-4">
+                  <p className="text-xs font-semibold text-amber-50">No Sui wallet detected.</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-50/70">
+                    Install Phantom, OKX Wallet, or Slush, then refresh this page.
+                  </p>
+                </div>
+              ) : (
+                detectedWallets.map((wallet) => {
+                  const connecting = connectingWallet === wallet.name;
+                  const connected =
+                    connectedWallet === wallet.name || (connection.wallet?.name === wallet.name && connection.isConnected);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => connectWallet(wallet)}
+                      disabled={Boolean(connectingWallet)}
+                      className="group flex min-h-14 w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3 text-left transition duration-300 hover:border-indigo-300/35 hover:bg-indigo-500/[0.09] hover:shadow-[0_0_28px_-18px_rgba(99,102,241,0.8)] disabled:cursor-wait disabled:opacity-70"
+                      key={walletKey(wallet)}
+                    >
+                      <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                        {wallet.icon ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={wallet.icon} alt={`${wallet.name} logo`} className="h-7 w-7 rounded-md object-contain" />
+                        ) : (
+                          <iconify-icon icon="solar:wallet-money-line-duotone" className="text-xl text-indigo-300" />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-white">{wallet.name}</span>
+                        <span className="mt-0.5 block text-xs text-zinc-500">
+                          {connected ? "Connected" : connecting ? "Awaiting wallet approval..." : "Detected. Connect with wallet approval."}
+                        </span>
+                      </span>
+                      <span className="hidden rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-zinc-400 sm:inline-flex">
+                        {connected ? "Connected" : "Detected"}
+                      </span>
+                      <span className="text-indigo-300">
+                        <iconify-icon
+                          icon={connected ? "solar:check-circle-bold-duotone" : connecting ? "solar:spinner-linear" : "solar:arrow-right-up-linear"}
+                          className={`text-lg ${connecting ? "animate-spin" : ""}`}
+                        />
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {missingWalletOptions.length > 0 && (
+            <div className="mt-5 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3">
+              <p className="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                Add another wallet
+              </p>
+              <div className="mt-3 grid gap-2">
+                {missingWalletOptions.map((option) => (
+                  <a
+                    key={option.id}
+                    href={option.installUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group flex items-center gap-3 rounded-xl border border-white/[0.07] bg-black/20 p-3 transition hover:border-indigo-300/30 hover:bg-indigo-500/[0.08]"
                   >
-                    <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-black/20">
-                      {wallet.icon ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={wallet.icon} alt={`${wallet.name} logo`} className="h-7 w-7 rounded-md object-contain" />
-                      ) : (
-                        <iconify-icon icon="solar:wallet-money-line-duotone" className="text-xl text-indigo-300" />
-                      )}
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-indigo-300">
+                      <iconify-icon icon="solar:wallet-money-line-duotone" className="text-lg" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-white">{wallet.name}</span>
-                      <span className="mt-0.5 block text-xs text-zinc-500">
-                        {connected ? "Connected" : connecting ? "Awaiting wallet approval..." : "Connect wallet"}
-                      </span>
+                      <span className="block text-sm font-medium text-zinc-100">{option.name}</span>
+                      <span className="mt-0.5 block text-xs text-zinc-500">Not detected in this browser.</span>
                     </span>
-                    <span className="text-indigo-300">
-                      <iconify-icon
-                        icon={connected ? "solar:check-circle-bold-duotone" : connecting ? "solar:spinner-linear" : "solar:arrow-right-up-linear"}
-                        className={`text-lg ${connecting ? "animate-spin" : ""}`}
-                      />
+                    <span className="shrink-0 rounded-full border border-white/10 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-zinc-400 transition group-hover:border-indigo-300/25 group-hover:text-indigo-200">
+                      {option.installLabel}
                     </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
+                  </a>
+                ))}
+              </div>
+              <p className="mt-3 text-[0.68rem] leading-5 text-zinc-500">
+                Installed wallets connect through dApp Kit. Install links are only shown for wallets that were not detected.
+              </p>
+            </div>
+          )}
 
           {error && (
             <div className="mt-4">
