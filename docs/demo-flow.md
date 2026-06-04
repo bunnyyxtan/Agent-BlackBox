@@ -33,13 +33,24 @@ Go to **Use Agent** and choose one agent mode:
 - **Risk Review Agent** — create a risk review with findings and mitigations
 - **Delivery Proof Agent** — create a delivery receipt and proof trail
 
-## Step 3 — Enter Your Task
+## Step 3 — Choose the Right Agent and Enter Your Task
 
-Add a clear task title and prompt.
+Add a clear task title and prompt. Choose the agent based on what you want Agent BlackBox to produce.
 
-Example prompts:
+### Which Agent Should You Use?
 
-### Sui Wallet Analysis
+| Agent | Use it when you want to... | Example task |
+|---|---|---|
+| **Sui Onchain Analyzer** | Analyze a Sui wallet, token holdings, transaction, object, or package. | “Analyze this Sui wallet and list its SUI/WAL holdings.” |
+| **Research Agent** | Investigate a topic, protocol, claim, project, or technical concept and create a research brief. | “Research how Walrus can store sealed AI-agent traces.” |
+| **Risk Review Agent** | Check what could go wrong and produce a risk matrix with severity, impact, and mitigations. | “Review the risks of deploying this app publicly.” |
+| **Delivery Proof Agent** | Create a proof-of-work receipt for completed work, client delivery, or hackathon submission. | “Create a sealed delivery receipt for this prototype.” |
+
+## Example Prompts
+
+### Sui Onchain Analyzer
+
+Use this when you want to analyze Sui wallet data or onchain proof information.
 
 ```text
 Analyze this Sui wallet and list token holdings returned by Sui RPC:
@@ -47,13 +58,17 @@ Analyze this Sui wallet and list token holdings returned by Sui RPC:
 0x0cebc8db9d911a312acbbaece48253379772bf8adb8f0bf211583800ea2084b6
 ```
 
-### Walrus Research
+### Research Agent
+
+Use this when you want the agent to investigate and explain a topic or claim.
 
 ```text
 Research how Walrus can store sealed AI-agent traces and support readback verification.
 ```
 
-### Risk Review
+### Risk Review Agent
+
+Use this when you want the agent to identify risks, severity, likelihood, impact, and mitigations.
 
 ```text
 Review the risks of deploying Agent BlackBox publicly for a hackathon demo.
@@ -61,7 +76,9 @@ Review the risks of deploying Agent BlackBox publicly for a hackathon demo.
 Focus on public API abuse, Walrus upload failures, Sui proof anchoring mistakes, and user trust risks.
 ```
 
-### Delivery Proof
+### Delivery Proof Agent
+
+Use this when you want the agent to create a delivery receipt and proof trail for completed work.
 
 ```text
 Create a sealed delivery receipt for the Agent BlackBox prototype.
