@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronRight, Clipboard, ExternalLink, FileJson, FileText, Fingerprint } from "lucide-react";
+import { Check, Clipboard, ExternalLink, FileJson, FileText, Fingerprint } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -669,7 +669,7 @@ export function AgentReportPanel({
             <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">
               <StatusBadge status={`${report.confidence} confidence`} />
               <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-mono text-xs text-slate-400">
-                {session.trace.timeline.length} proof steps
+                {session.trace.timeline.length} replay events
               </span>
               <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-mono text-xs text-slate-400">
                 {userFacingFindings.length} findings
@@ -783,16 +783,7 @@ export function AgentReportPanel({
         </section>
       </div>
 
-      <details className="group border-t border-white/[0.06]">
-        <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 text-sm font-semibold text-slate-300 transition hover:bg-white/[0.025] [&::-webkit-details-marker]:hidden">
-          <ChevronRight className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-90" />
-          View report evidence and technical details
-          <span className="ml-auto hidden font-mono text-[0.65rem] font-normal text-slate-600 sm:inline">
-            Sources / proof status / tool trail
-          </span>
-        </summary>
-
-      <div className="space-y-5 p-5 pt-0">
+      <div className="space-y-5 p-5">
         <div className="min-w-0 space-y-5">
           {onchain && (
             <section className="min-w-0 rounded-2xl border border-cyan/15 bg-cyan/[0.025] p-4">
@@ -1059,7 +1050,6 @@ export function AgentReportPanel({
           )}
         </section>
       </div>
-      </details>
 
     </GlassCard>
   );
