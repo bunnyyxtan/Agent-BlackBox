@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { apiErrorPayload, BODY_SIZE_LIMITS, readJsonRequest, SafeRequestError, safeRequestErrorPayload } from "@/lib/http/safe-request";
 import { guardApiRequest } from "@/lib/security/api-guard";
-import { getSessionById } from "@/lib/session-service";
+import { getSessionByIdSafe } from "@/lib/session-service";
 import { isValidTransactionDigest } from "@/lib/sui-client-helpers";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
 import { verifyProofMetadata } from "@/lib/tatum-rpc";
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   }
 
   const sessionId = readString(body.sessionId);
-  const session = sessionId ? await getSessionById(sessionId) : undefined;
+  const session = sessionId ? await getSessionByIdSafe(sessionId) : undefined;
   const proofRegistry = getSuiProofRegistryConfig();
   if (sessionId && !session) {
     return NextResponse.json(apiErrorPayload("SESSION_NOT_FOUND", "Session not found."), { status: 404 });

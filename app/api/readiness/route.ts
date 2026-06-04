@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getSessionEvidenceStatus } from "@/lib/constants";
 import { getNetworkConfig } from "@/lib/network-config";
 import { guardApiRequest } from "@/lib/security/api-guard";
-import { listSessions } from "@/lib/session-service";
+import { listSessionsSafe } from "@/lib/session-service";
 import { getUploadRelayTipConfig } from "@/lib/storage-adapters/walrus-sdk-relay";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
 import { checkTatumSuiRpcReachability, getTatumSuiRpcConfig } from "@/lib/tatum-rpc";
@@ -22,15 +22,53 @@ function formatTatumRpcStatus(
   return reachability.reachable ? "Ready" : "Unavailable";
 }
 
+function fallbackTatumReachability(message = "Tatum Sui RPC readiness check could not run.") {
+  return {
+    configured: false,
+    reachable: false,
+    checkedAt: new Date().toISOString(),
+    message,
+  };
+}
+
+function safeHost(value: string) {
+  if (!value) return undefined;
+  try {
+    return new URL(value).host;
+  } catch {
+    return "Invalid URL";
+  }
+}
+
+function fallbackRelayStatus(message = "Walrus upload relay readiness check could not run.") {
+  const walrus = getWalrusConfiguration();
+  return {
+    configured: walrus.relayConfigured,
+    reachable: false,
+    network: walrus.network,
+    relayUrl: walrus.relayUrl,
+    relayHost: safeHost(walrus.relayUrl),
+    tipRequirement: "unknown" as const,
+    tipConfig: null,
+    checkedAt: new Date().toISOString(),
+    error: message,
+  };
+}
+
 export async function GET(request: Request) {
   const guard = await guardApiRequest(request, { profile: "read" });
   if (guard) return guard;
 
-  const [sessions, tatumReachability, relayStatus] = await Promise.all([
-    listSessions(),
-    checkTatumSuiRpcReachability(),
-    getUploadRelayTipConfig(),
+  const [sessionResult, tatumReachability, relayStatus] = await Promise.all([
+    listSessionsSafe(),
+    checkTatumSuiRpcReachability().catch((error) =>
+      fallbackTatumReachability(error instanceof Error ? error.message : undefined),
+    ),
+    getUploadRelayTipConfig().catch((error) =>
+      fallbackRelayStatus(error instanceof Error ? error.message : undefined),
+    ),
   ]);
+  const { sessions } = sessionResult;
   const latest = sessions[0];
   const walrus = getWalrusConfiguration();
   const proof = getSuiProofRegistryConfig();
@@ -61,6 +99,7 @@ export async function GET(request: Request) {
           ? "Local Trace"
           : "Prepared"
       : "No sessions yet",
+    sessionStoreWarning: sessionResult.warning,
   };
   const response: ApiSuccessResponse<typeof result> = {
     ok: true,

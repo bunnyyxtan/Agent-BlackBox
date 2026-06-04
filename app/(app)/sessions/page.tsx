@@ -1,13 +1,14 @@
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
 
+import { SessionStoreWarning } from "@/components/blackbox/SessionStoreWarning";
 import { SessionsListClient } from "@/components/blackbox/SessionsListClient";
-import { listSessions } from "@/lib/session-service";
+import { listSessionsSafe } from "@/lib/session-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function SessionsPage() {
-  const sessions = await listSessions();
+  const { sessions, warning: sessionStoreWarning } = await listSessionsSafe();
   return (
     <>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -23,6 +24,11 @@ export default async function SessionsPage() {
           Use Agent
         </Link>
       </div>
+      {sessionStoreWarning ? (
+        <div className="mt-6">
+          <SessionStoreWarning message={sessionStoreWarning} />
+        </div>
+      ) : null}
       <div className="mt-6">
         <SessionsListClient sessions={sessions} />
       </div>

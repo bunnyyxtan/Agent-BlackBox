@@ -2,16 +2,17 @@ import { LockKeyhole } from "lucide-react";
 
 import { StorageJobCard } from "@/components/blackbox/StorageJobCard";
 import { StorageRelayStatusCard } from "@/components/blackbox/StorageRelayStatusCard";
+import { SessionStoreWarning } from "@/components/blackbox/SessionStoreWarning";
 import { WalrusVerificationPanel } from "@/components/blackbox/WalrusVerificationPanel";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
-import { listSessions } from "@/lib/session-service";
+import { listSessionsSafe } from "@/lib/session-service";
 import { getWalrusConfiguration, getWalrusNetworkLabel } from "@/lib/walrus";
 
 export const dynamic = "force-dynamic";
 
 export default async function StoragePage() {
-  const sessions = await listSessions();
+  const { sessions, warning: sessionStoreWarning } = await listSessionsSafe();
   const walrus = getWalrusConfiguration();
   const walrusNetworkLabel = getWalrusNetworkLabel(walrus.network);
   return (
@@ -32,6 +33,12 @@ export default async function StoragePage() {
         relayConfigured={walrus.relayConfigured}
         walrusNetworkLabel={walrusNetworkLabel}
       />
+
+      {sessionStoreWarning ? (
+        <div className="mt-6">
+          <SessionStoreWarning message={sessionStoreWarning} />
+        </div>
+      ) : null}
 
       <section className="mt-7">
         <div className="mb-3 flex items-center gap-2">

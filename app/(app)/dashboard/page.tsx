@@ -1,15 +1,16 @@
 import Link from "next/link";
 
+import { SessionStoreWarning } from "@/components/blackbox/SessionStoreWarning";
 import { SessionsListClient } from "@/components/blackbox/SessionsListClient";
 import { SystemIntegrityPanel } from "@/components/blackbox/SystemIntegrityPanel";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { StatCard } from "@/components/ui/StatCard";
-import { listSessions } from "@/lib/session-service";
+import { listSessionsSafe } from "@/lib/session-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const sessions = await listSessions();
+  const { sessions, warning: sessionStoreWarning } = await listSessionsSafe();
   const walrusStored = sessions.filter(
     (session) => session.storage.storageProvider !== "local" && session.verification.directWalrusReadPassed,
   ).length;
@@ -67,6 +68,12 @@ export default async function DashboardPage() {
           icon="solar:verified-check-bold-duotone"
         />
       </div>
+
+      {sessionStoreWarning ? (
+        <div className="mt-5">
+          <SessionStoreWarning message={sessionStoreWarning} />
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_21rem]">
         <div className="xl:pt-6">

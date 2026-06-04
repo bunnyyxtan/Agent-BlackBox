@@ -38,7 +38,12 @@ import type {
   VerificationResult,
 } from "@/types/blackbox";
 
-const STORE_PATH = path.join(process.cwd(), ".data", "sessions.json");
+const SESSION_STORE_DIR =
+  process.env.AGENT_BLACKBOX_SESSION_STORE_DIR?.trim() ||
+  (process.env.VERCEL === "1"
+    ? path.join(process.env.TMPDIR || process.env.TEMP || "/tmp", "agent-blackbox")
+    : path.join(process.cwd(), ".data"));
+const STORE_PATH = path.join(SESSION_STORE_DIR, "sessions.json");
 const SUPPORTED_AGENT_MODES = new Set<AgentMode>([
   "research",
   "risk_review",
@@ -51,6 +56,11 @@ const RETIRED_SEED_SESSION_IDS = new Set(["abx-research-market"]);
 interface SessionStoreFile {
   version: 1;
   sessions: AgentSession[];
+}
+
+export interface SafeSessionListResult {
+  sessions: AgentSession[];
+  warning: string | null;
 }
 
 interface NormalizedSessionInput extends CreateSessionInput {
@@ -206,6 +216,36 @@ async function buildStoredSession(
 let initializationPromise: Promise<AgentSession[]> | null = null;
 let storeMutationQueue: Promise<void> = Promise.resolve();
 
+function isVercelRuntime() {
+  return process.env.VERCEL === "1";
+}
+
+function shouldWriteSeedSessions() {
+  return process.env.AGENT_BLACKBOX_SEED_SESSIONS === "true" && !isVercelRuntime();
+}
+
+function getServerlessSessionStoreWarning() {
+  if (!isVercelRuntime()) return null;
+  return "This deployment is using local JSON session storage, which is not durable on Vercel. The page will stay available, but production sessions need durable storage.";
+}
+
+function formatSessionStoreWarning(error: unknown) {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as NodeJS.ErrnoException).code)
+      : "";
+  if (code === "ENOENT") {
+    return "No local session archive was found. Showing an empty session list.";
+  }
+  if (code === "EACCES" || code === "EROFS" || code === "EPERM") {
+    return "Local session storage is not writable in this deployment. Showing an empty session list.";
+  }
+  if (error instanceof SyntaxError) {
+    return "The local session archive could not be parsed. Showing an empty session list.";
+  }
+  return "Local session storage is unavailable. Showing an empty session list.";
+}
+
 async function withStoreMutation<T>(operation: () => Promise<T>) {
   const previous = storeMutationQueue;
   let release!: () => void;
@@ -258,11 +298,17 @@ async function readStore() {
   try {
     const raw = await readFile(STORE_PATH, "utf8");
     const payload = JSON.parse(raw) as SessionStoreFile;
-    const sessions = await ensureSeedSessionCoverage(payload.sessions ?? []);
+    const storedSessions = (payload.sessions ?? []).filter(
+      (session) => !RETIRED_SEED_SESSION_IDS.has(session.id),
+    );
+    const sessions = shouldWriteSeedSessions()
+      ? await ensureSeedSessionCoverage(storedSessions)
+      : storedSessions;
     hydrateLocalAdapter(sessions);
     return sessions;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (!shouldWriteSeedSessions()) return [];
     initializationPromise ??= initializeStore();
     const sessions = await initializationPromise;
     hydrateLocalAdapter(sessions);
@@ -539,9 +585,32 @@ export async function listSessions() {
   return [...sessions].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+export async function listSessionsSafe(): Promise<SafeSessionListResult> {
+  try {
+    const sessions = await listSessions();
+    return {
+      sessions,
+      warning: getServerlessSessionStoreWarning(),
+    };
+  } catch (error) {
+    return {
+      sessions: [],
+      warning: formatSessionStoreWarning(error),
+    };
+  }
+}
+
 export async function getSessionById(id: string) {
   const sessions = await readStore();
   return sessions.find((session) => session.id === id);
+}
+
+export async function getSessionByIdSafe(id: string) {
+  try {
+    return await getSessionById(id);
+  } catch {
+    return undefined;
+  }
 }
 
 function shortReference(value: string | null | undefined, head = 12, tail = 8) {
@@ -592,6 +661,14 @@ export function redactSessionSummary(session: AgentSession) {
 export async function listSessionSummaries() {
   const sessions = await listSessions();
   return sessions.map(redactSessionSummary);
+}
+
+export async function listSessionSummariesSafe() {
+  const { sessions, warning } = await listSessionsSafe();
+  return {
+    sessions: sessions.map(redactSessionSummary),
+    warning,
+  };
 }
 
 export async function anchorSessionProof(id: string, input: ProofAnchorInput) {
@@ -705,7 +782,7 @@ export async function anchorSessionProof(id: string, input: ProofAnchorInput) {
 }
 
 export async function verifySession(id: string): Promise<LocalVerificationReport | undefined> {
-  const session = await getSessionById(id);
+  const session = await getSessionByIdSafe(id);
   if (!session) return undefined;
 
   const adapter = getStorageAdapter(session.storage.storageProvider);
@@ -809,7 +886,7 @@ export async function simulateTamper(
   id: string,
   tamperedOutput?: string,
 ): Promise<TamperSimulationResult | undefined> {
-  const session = await getSessionById(id);
+  const session = await getSessionByIdSafe(id);
   if (!session) return undefined;
 
   const requestedOutput = tamperedOutput?.trim();
@@ -837,15 +914,28 @@ export async function simulateTamper(
 }
 
 export async function hydrateSessionStore() {
-  await readStore();
+  try {
+    await readStore();
+    return { ok: true, warning: getServerlessSessionStoreWarning() };
+  } catch (error) {
+    return { ok: false, warning: formatSessionStoreWarning(error) };
+  }
 }
 
 export async function getStorageReferenceByBlobId(blobId: string) {
-  const sessions = await readStore();
-  return sessions.find((session) => session.storage.blobId === blobId)?.storage;
+  try {
+    const sessions = await readStore();
+    return sessions.find((session) => session.storage.blobId === blobId)?.storage;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function getStorageReferenceByUploadJobId(uploadJobId: string) {
-  const sessions = await readStore();
-  return sessions.find((session) => session.storage.uploadJobId === uploadJobId)?.storage;
+  try {
+    const sessions = await readStore();
+    return sessions.find((session) => session.storage.uploadJobId === uploadJobId)?.storage;
+  } catch {
+    return undefined;
+  }
 }

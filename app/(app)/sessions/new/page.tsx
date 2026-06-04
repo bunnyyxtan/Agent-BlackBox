@@ -1,5 +1,5 @@
 import { NewSessionForm } from "@/components/blackbox/NewSessionForm";
-import { getSessionById } from "@/lib/session-service";
+import { getSessionByIdSafe } from "@/lib/session-service";
 import type { AgentMode, AgentSession, SessionRerunPrefill, StorageMode } from "@/types/blackbox";
 
 const AGENT_MODES = new Set<AgentMode>(["research", "risk_review", "delivery_proof", "onchain_monitor"]);
@@ -49,7 +49,7 @@ export default async function NewSessionPage({
   let rerunError: string | undefined;
 
   if (rerunId) {
-    const sourceSession = await getSessionById(rerunId);
+    const sourceSession = await getSessionByIdSafe(rerunId);
     if (sourceSession) {
       rerunPrefill = buildRerunPrefill(sourceSession);
     } else {

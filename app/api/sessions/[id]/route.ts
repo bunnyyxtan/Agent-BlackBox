@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 
 import { apiErrorPayload } from "@/lib/http/safe-request";
 import { isApiGuardEnabled, isApiRequestAuthorized } from "@/lib/security/api-guard";
-import { getSessionById, redactSessionSummary } from "@/lib/session-service";
+import { getSessionByIdSafe, redactSessionSummary } from "@/lib/session-service";
 import type { ApiSuccessResponse } from "@/types/blackbox";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await getSessionById(id);
+  const session = await getSessionByIdSafe(id);
   if (!session) {
     return NextResponse.json(apiErrorPayload("SESSION_NOT_FOUND", "Session not found."), { status: 404 });
   }
