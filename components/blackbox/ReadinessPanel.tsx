@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { useEffect, useState } from "react";
 import { Activity, ShieldCheck } from "lucide-react";
 
@@ -59,6 +60,7 @@ function shouldRenderReadinessBadge(value: string) {
 }
 
 export function ReadinessPanel() {
+  const account = useCurrentAccount();
   const [data, setData] = useState<ReadinessPayload["data"] | null>(null);
   const [error, setError] = useState("");
 
@@ -66,7 +68,10 @@ export function ReadinessPanel() {
     let cancelled = false;
     async function loadReadiness() {
       try {
-        const response = await fetch("/api/readiness", { cache: "no-store" });
+        const endpoint = account?.address
+          ? `/api/readiness?ownerWallet=${encodeURIComponent(account.address)}`
+          : "/api/readiness";
+        const response = await fetch(endpoint, { cache: "no-store" });
         const payload = (await response.json()) as ReadinessPayload;
         if (!cancelled) setData(payload.data ?? null);
       } catch (readinessError) {
@@ -79,7 +84,7 @@ export function ReadinessPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [account?.address]);
 
   const rows = data
     ? [

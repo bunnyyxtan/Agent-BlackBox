@@ -3,7 +3,7 @@
 import { useCurrentAccount, useCurrentNetwork, useDAppKit } from "@mysten/dapp-kit-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { AgentExecutionWorkspace } from "@/components/blackbox/AgentExecutionWorkspace";
 import { AgentModeSelector } from "@/components/blackbox/AgentModeSelector";
@@ -104,6 +104,12 @@ interface FinalizeStoragePayload {
   details?: string;
 }
 
+interface SessionLookupPayload {
+  data?: { session?: AgentSession };
+  message?: string;
+  error?: { message?: string };
+}
+
 interface ExecutionArtifacts {
   prepared?: NonNullable<PrepareSessionPayload["data"]>;
   storage?: StorageReference;
@@ -111,8 +117,41 @@ interface ExecutionArtifacts {
 }
 
 interface NewSessionFormProps {
+  rerunId?: string;
   rerunError?: string;
   rerunPrefill?: SessionRerunPrefill;
+}
+
+const AGENT_MODES = new Set<AgentMode>(["research", "risk_review", "delivery_proof", "onchain_monitor"]);
+const STORAGE_MODES = new Set<StorageMode>(["deletable", "permanent"]);
+
+function normalizeAgentMode(value: AgentSession["agentMode"]): AgentMode {
+  return AGENT_MODES.has(value) ? value : "research";
+}
+
+function normalizeStorageMode(value: AgentSession["storageMode"]): StorageMode {
+  return STORAGE_MODES.has(value) ? value : "deletable";
+}
+
+function normalizeStorageEpochs(session: AgentSession) {
+  const epochs = session.storageEpochs || session.storage.storageEpochs || 1;
+  return Number.isInteger(epochs) && epochs >= 1 && epochs <= 53 ? epochs : 1;
+}
+
+function buildRerunPrefill(session: AgentSession): SessionRerunPrefill {
+  return {
+    sourceSessionId: session.id,
+    title: session.title ?? "",
+    prompt: session.prompt ?? "",
+    agentMode: normalizeAgentMode(session.agentMode),
+    storageMode: normalizeStorageMode(session.storageMode),
+    storageEpochs: normalizeStorageEpochs(session),
+    inputFiles: session.inputFiles.map((file) => ({
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    })),
+  };
 }
 
 function initialExecutionProgress() {
@@ -269,12 +308,14 @@ function classifyWalrusUploadError(error: unknown): WalrusUploadErrorCode {
   return "upload_failed";
 }
 
-export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps = {}) {
+export function NewSessionForm({ rerunError, rerunId, rerunPrefill }: NewSessionFormProps = {}) {
   const router = useRouter();
   const walletAccount = useCurrentAccount();
   const walletNetwork = useCurrentNetwork();
   const dAppKit = useDAppKit();
   const [activeRerunPrefill, setActiveRerunPrefill] = useState<SessionRerunPrefill | null>(rerunPrefill ?? null);
+  const [rerunLoadError, setRerunLoadError] = useState(rerunError ?? "");
+  const [rerunLoading, setRerunLoading] = useState(false);
   const [title, setTitle] = useState(rerunPrefill?.title ?? "");
   const [prompt, setPrompt] = useState(rerunPrefill?.prompt ?? "");
   const [agentMode, setAgentMode] = useState<AgentMode>(rerunPrefill?.agentMode ?? "research");
@@ -297,6 +338,48 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
   const executionProgressPercent = Math.round((completedStepCount / EXECUTION_STEPS.length) * 100);
   const formReady = title.trim().length > 0 && prompt.trim().length > 0;
   const rerunFileNames = activeRerunPrefill?.inputFiles.map((file) => file.name).filter(Boolean) ?? [];
+
+  useEffect(() => {
+    if (!rerunId || rerunPrefill || activeRerunPrefill?.sourceSessionId === rerunId) return;
+    if (!walletAccount?.address) {
+      setRerunLoadError("Connect the session owner wallet to load re-run prefill.");
+      return;
+    }
+
+    const controller = new AbortController();
+    const endpoint = `/api/sessions/${encodeURIComponent(rerunId)}?ownerWallet=${encodeURIComponent(walletAccount.address)}`;
+    setRerunLoading(true);
+    setRerunLoadError("");
+
+    fetch(endpoint, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await readJsonResponse<SessionLookupPayload>(response, `GET ${endpoint}`);
+        if (!response.ok || !payload.data?.session) {
+          throw new Error(payload.error?.message ?? payload.message ?? "Could not load previous session for re-run.");
+        }
+        return payload.data.session;
+      })
+      .then((sourceSession) => {
+        const prefill = buildRerunPrefill(sourceSession);
+        setActiveRerunPrefill(prefill);
+        setTitle(prefill.title);
+        setPrompt(prefill.prompt);
+        setAgentMode(prefill.agentMode);
+        setFiles([]);
+        setStorageEpochs(prefill.storageEpochs);
+        setStorageMode(prefill.storageMode);
+        setRerunLoadError("");
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setRerunLoadError(error instanceof Error ? error.message : "Could not load previous session for re-run.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRerunLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [activeRerunPrefill?.sourceSessionId, rerunId, rerunPrefill, walletAccount?.address]);
 
   function clearRerunPrefill() {
     setActiveRerunPrefill(null);
@@ -742,6 +825,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        ownerWallet: walletAccount?.address,
         uploadJobId: storage.uploadJobId,
         blobId: storage.blobId,
         blobObjectId: storage.blobObjectId,
@@ -885,7 +969,7 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
             </p>
           </div>
 
-          {(activeRerunPrefill || rerunError) && (
+          {(activeRerunPrefill || rerunLoadError || rerunLoading) && (
             <div
               className={`relative overflow-hidden rounded-2xl border p-4 ${
                 activeRerunPrefill
@@ -897,12 +981,18 @@ export function NewSessionForm({ rerunError, rerunPrefill }: NewSessionFormProps
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <p className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-cyan-200">
-                    {activeRerunPrefill ? "Re-running previous session" : "Re-run prefill unavailable"}
+                    {activeRerunPrefill
+                      ? "Re-running previous session"
+                      : rerunLoading
+                        ? "Loading re-run prefill"
+                        : "Re-run prefill unavailable"}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-300 [overflow-wrap:anywhere]">
                     {activeRerunPrefill
                       ? `This form was prefilled from session ${activeRerunPrefill.sourceSessionId}. Review or edit before running.`
-                      : rerunError}
+                      : rerunLoading
+                        ? "Checking the connected wallet before loading the previous session."
+                        : rerunLoadError}
                   </p>
                   {activeRerunPrefill && rerunFileNames.length > 0 && (
                     <p className="mt-2 text-xs leading-5 text-amber-100/80 [overflow-wrap:anywhere]">

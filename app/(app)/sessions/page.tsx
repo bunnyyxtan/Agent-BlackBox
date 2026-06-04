@@ -1,13 +1,11 @@
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
 
-import { SessionsListClient } from "@/components/blackbox/SessionsListClient";
-import { listSessionsSafe } from "@/lib/session-service";
+import { SessionsArchiveWalletScope } from "@/components/blackbox/WalletScopedSessions";
 
 export const dynamic = "force-dynamic";
 
-export default async function SessionsPage() {
-  const { sessions, sampleFallback } = await listSessionsSafe();
+export default function SessionsPage() {
   return (
     <>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -23,14 +21,7 @@ export default async function SessionsPage() {
           Use Agent
         </Link>
       </div>
-      {sampleFallback ? (
-        <p className="mt-6 rounded-2xl border border-cyan/15 bg-cyan/[0.035] px-4 py-3 text-xs leading-5 text-slate-400">
-          Sample traces are shown until this deployment records its first real session.
-        </p>
-      ) : null}
-      <div className="mt-6">
-        <SessionsListClient sessions={sessions} />
-      </div>
+      <SessionsArchiveWalletScope />
     </>
   );
 }

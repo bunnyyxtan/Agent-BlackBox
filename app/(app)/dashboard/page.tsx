@@ -1,25 +1,12 @@
 import Link from "next/link";
 
-import { SessionsListClient } from "@/components/blackbox/SessionsListClient";
 import { SystemIntegrityPanel } from "@/components/blackbox/SystemIntegrityPanel";
+import { DashboardWalletScope } from "@/components/blackbox/WalletScopedSessions";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { StatCard } from "@/components/ui/StatCard";
-import { listSessionsSafe } from "@/lib/session-service";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const { sessions, realCount, sampleFallback } = await listSessionsSafe();
-  const realSessions = sessions.filter((session) => !session.isSample);
-  const walrusStored = realSessions.filter(
-    (session) => session.storage.storageProvider !== "local" && session.verification.directWalrusReadPassed,
-  ).length;
-  const suiAnchored = realSessions.filter(
-    (session) => session.proof.status === "anchored" || session.proof.status === "verified",
-  ).length;
-  const fullyVerified = realSessions.filter(
-    (session) => session.verification.directWalrusReadPassed && session.verification.tatumRpcPassed,
-  ).length;
+export default function DashboardPage() {
   return (
     <>
       <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between mb-8">
@@ -40,56 +27,9 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total Sessions"
-          value={sampleFallback ? sessions.length : realCount}
-          detail={sampleFallback ? "Sample traces shown" : "Replayable agent records"}
-          icon="solar:document-text-line-duotone"
-        />
-        <StatCard
-          label="Stored Blobs"
-          value={walrusStored}
-          detail={sampleFallback ? "Real Walrus proofs after first run" : "Walrus readback matched"}
-          icon="solar:database-line-duotone"
-          protocol="walrus"
-        />
-        <StatCard
-          label="Sui Anchors"
-          value={suiAnchored}
-          detail={sampleFallback ? "Real anchors after first run" : "Onchain proof references"}
-          icon="solar:waterdrop-line-duotone"
-          protocol="sui"
-        />
-        <StatCard
-          label="Fully Verified"
-          value={fullyVerified}
-          detail={sampleFallback ? "Real verified sessions after first run" : "Walrus and Sui checks passed"}
-          icon="solar:verified-check-bold-duotone"
-        />
-      </div>
+      <DashboardWalletScope />
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_21rem]">
-        <div className="xl:pt-6">
-          <div className="mb-4 flex items-baseline justify-between gap-3 border-b border-white/5 pb-4">
-            <div>
-              <h2 className="text-sm font-medium text-white">Recent sessions</h2>
-              {sampleFallback ? (
-                <p className="mt-1 text-xs text-slate-500">
-                  Sample traces are shown because this deployment has no recorded sessions yet.
-                </p>
-              ) : null}
-            </div>
-            <Link
-              href="/sessions"
-              prefetch
-              className="text-xs font-medium uppercase tracking-[0.1em] text-indigo-300 transition-colors hover:text-indigo-200"
-            >
-              View all
-            </Link>
-          </div>
-          <SessionsListClient sessions={sessions} limit={4} />
-        </div>
+      <div className="mt-5">
         <SystemIntegrityPanel />
       </div>
 

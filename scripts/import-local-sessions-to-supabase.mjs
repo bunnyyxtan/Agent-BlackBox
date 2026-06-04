@@ -44,6 +44,16 @@ function normalizeTimestamp(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function normalizeSuiAddressForCompare(value) {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) return null;
+  const hex = trimmed.startsWith("0x") ? trimmed.slice(2) : trimmed;
+  if (!/^[0-9a-fA-F]{1,64}$/.test(hex)) {
+    return trimmed.toLowerCase();
+  }
+  return `0x${hex.toLowerCase().padStart(64, "0")}`;
+}
+
 function getSessionEvidenceStatus(session) {
   if (session.isSample || session.isDemo) {
     return "Sample Trace";
@@ -110,7 +120,23 @@ function toSupabaseSessionRow(session) {
 
   return {
     id: String(session.id),
-    owner_wallet: readPath(session, ["ownerAddress", "ownerWallet", "owner_wallet", "proof.owner"], null),
+    owner_wallet: normalizeSuiAddressForCompare(
+      readPath(
+        session,
+        [
+          "ownerAddress",
+          "ownerWallet",
+          "owner_wallet",
+          "wallet",
+          "owner",
+          "proof.owner",
+          "proof.ownerWallet",
+          "trace.ownerWallet",
+          "trace.ownerWalletAddress",
+        ],
+        null,
+      ),
+    ),
     agent_mode: readPath(session, ["agentMode", "agent_mode", "mode"], null),
     title: readPath(session, ["title"], null),
     prompt: readPath(session, ["prompt", "task.prompt", "originalPrompt"], null),

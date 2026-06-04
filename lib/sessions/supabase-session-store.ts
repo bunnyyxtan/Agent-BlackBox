@@ -3,6 +3,7 @@ import "server-only";
 import { getSessionEvidenceStatus } from "@/lib/constants";
 import { getSupabaseAdminClient, getSupabaseStorageStatus } from "@/lib/supabase/server";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
+import { normalizeSuiAddressForCompare } from "@/lib/sui-client-helpers";
 import type { AgentSession } from "@/types/blackbox";
 
 const TABLE_NAME = "agent_sessions";
@@ -76,12 +77,17 @@ function statusFromBoolean(value: boolean | null | undefined, positive: string, 
   return negative;
 }
 
+function normalizeOwnerWallet(value?: string | null) {
+  const normalized = normalizeSuiAddressForCompare(value);
+  return normalized || null;
+}
+
 export function toSupabaseSessionRow(session: AgentSession) {
   const proofRegistry = getSuiProofRegistryConfig();
   const report = session.trace.structuredOutput;
   return {
     id: session.id,
-    owner_wallet: session.ownerAddress,
+    owner_wallet: normalizeOwnerWallet(session.ownerAddress),
     agent_mode: session.agentMode,
     title: session.title,
     prompt: session.prompt,
@@ -142,6 +148,27 @@ export async function listSupabaseSessions() {
     .filter((session): session is AgentSession => Boolean(session));
 }
 
+export async function listSupabaseSessionsForWallet(ownerWallet: string) {
+  const client = getSupabaseAdminClient();
+  const normalizedOwner = normalizeOwnerWallet(ownerWallet);
+  if (!client || !normalizedOwner) return [];
+
+  const { data, error } = await withSupabaseTimeout(
+    client
+      .from(TABLE_NAME)
+      .select("*")
+      .eq("owner_wallet", normalizedOwner)
+      .eq("is_demo", false)
+      .order("created_at", { ascending: false }),
+    "Supabase wallet-scoped session list",
+  );
+
+  if (error) throw new Error(normalizeError(error));
+  return ((data ?? []) as AgentSessionRow[])
+    .map(fromSupabaseSessionRow)
+    .filter((session): session is AgentSession => Boolean(session));
+}
+
 export async function getSupabaseSessionById(id: string) {
   const client = getSupabaseAdminClient();
   if (!client) return undefined;
@@ -153,6 +180,26 @@ export async function getSupabaseSessionById(id: string) {
       .eq("id", id)
       .maybeSingle(),
     "Supabase session lookup",
+  );
+
+  if (error) throw new Error(normalizeError(error));
+  return data ? fromSupabaseSessionRow(data as AgentSessionRow) ?? undefined : undefined;
+}
+
+export async function getSupabaseSessionByIdForWallet(id: string, ownerWallet: string) {
+  const client = getSupabaseAdminClient();
+  const normalizedOwner = normalizeOwnerWallet(ownerWallet);
+  if (!client || !normalizedOwner) return undefined;
+
+  const { data, error } = await withSupabaseTimeout(
+    client
+      .from(TABLE_NAME)
+      .select("*")
+      .eq("id", id)
+      .eq("owner_wallet", normalizedOwner)
+      .eq("is_demo", false)
+      .maybeSingle(),
+    "Supabase wallet-scoped session lookup",
   );
 
   if (error) throw new Error(normalizeError(error));

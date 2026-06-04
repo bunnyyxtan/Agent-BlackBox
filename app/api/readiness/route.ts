@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getSessionEvidenceStatus } from "@/lib/constants";
 import { getNetworkConfig } from "@/lib/network-config";
 import { guardApiRequest } from "@/lib/security/api-guard";
-import { getSessionStorageDiagnostics, listSessionsSafe } from "@/lib/session-service";
+import { getSessionStorageDiagnostics, listSessionsSafeForWallet } from "@/lib/session-service";
 import { getUploadRelayTipConfig } from "@/lib/storage-adapters/walrus-sdk-relay";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
 import { checkTatumSuiRpcReachability, getTatumSuiRpcConfig } from "@/lib/tatum-rpc";
@@ -58,9 +58,11 @@ function fallbackRelayStatus(message = "Walrus upload relay readiness check coul
 export async function GET(request: Request) {
   const guard = await guardApiRequest(request, { profile: "read" });
   if (guard) return guard;
+  const url = new URL(request.url);
+  const ownerWallet = url.searchParams.get("ownerWallet") ?? "";
 
   const [sessionResult, storageDiagnostics, tatumReachability, relayStatus] = await Promise.all([
-    listSessionsSafe(),
+    listSessionsSafeForWallet(ownerWallet),
     getSessionStorageDiagnostics(),
     checkTatumSuiRpcReachability().catch((error) =>
       fallbackTatumReachability(error instanceof Error ? error.message : undefined),

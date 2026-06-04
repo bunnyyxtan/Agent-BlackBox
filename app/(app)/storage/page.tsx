@@ -1,17 +1,13 @@
 import { LockKeyhole } from "lucide-react";
 
-import { StorageJobCard } from "@/components/blackbox/StorageJobCard";
 import { StorageRelayStatusCard } from "@/components/blackbox/StorageRelayStatusCard";
-import { WalrusVerificationPanel } from "@/components/blackbox/WalrusVerificationPanel";
+import { StorageOperationsWalletScope } from "@/components/blackbox/WalletScopedSessions";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
-import { listSessionsSafe } from "@/lib/session-service";
 import { getWalrusConfiguration, getWalrusNetworkLabel } from "@/lib/walrus";
 
 export const dynamic = "force-dynamic";
 
 export default async function StoragePage() {
-  const { sessions, sampleFallback } = await listSessionsSafe();
   const walrus = getWalrusConfiguration();
   const walrusNetworkLabel = getWalrusNetworkLabel(walrus.network);
   return (
@@ -33,51 +29,7 @@ export default async function StoragePage() {
         walrusNetworkLabel={walrusNetworkLabel}
       />
 
-      {sampleFallback ? (
-        <p className="mt-6 rounded-2xl border border-cyan/15 bg-cyan/[0.035] px-4 py-3 text-xs leading-5 text-slate-400">
-          Sample traces are shown here for public presentation. Run a real agent session to create live Walrus storage references.
-        </p>
-      ) : null}
-
-      <section className="mt-7">
-        <div className="mb-3 flex items-center gap-2">
-          <ProtocolLogo protocol="walrus" size="sm" />
-          <div>
-            <h2 className="text-base font-semibold text-white">{walrusNetworkLabel} Blob Storage</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Blob references, upload adapter metadata, expiry, and renewal lifecycle.
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-3 xl:grid-cols-2">
-          {sessions.map((session) => (
-            <StorageJobCard
-              expectedTraceHash={session.trace.traceHash}
-              job={session.storage}
-              key={session.storage.uploadJobId}
-              verification={session.walrusVerification}
-              walrusNetworkLabel={walrusNetworkLabel}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <div className="mb-3 flex items-center gap-2">
-          <ProtocolLogo protocol="walrus" size="sm" />
-          <div>
-            <h2 className="text-base font-semibold text-white">Direct {walrusNetworkLabel} Verification</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Blob IDs, Walrus object references, read status, hash comparison, and replay readiness.
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-3 xl:grid-cols-3">
-          {sessions.map((session) => (
-            <WalrusVerificationPanel verification={session.walrusVerification} key={session.id} />
-          ))}
-        </div>
-      </section>
+      <StorageOperationsWalletScope walrusNetworkLabel={walrusNetworkLabel} />
 
       <GlassCard className="mt-6 border-amber-200/15 bg-amber-200/[0.035] p-4">
         <div className="flex items-start gap-2">

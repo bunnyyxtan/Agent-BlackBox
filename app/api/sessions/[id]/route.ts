@@ -2,14 +2,19 @@ import { NextResponse } from "next/server";
 
 import { apiErrorPayload } from "@/lib/http/safe-request";
 import { isApiGuardEnabled, isApiRequestAuthorized } from "@/lib/security/api-guard";
-import { getSessionByIdSafe, redactSessionSummary } from "@/lib/session-service";
+import { getSessionForWalletSafe, redactSessionSummary } from "@/lib/session-service";
 import type { ApiSuccessResponse } from "@/types/blackbox";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await getSessionByIdSafe(id);
+  const url = new URL(request.url);
+  const ownerWallet = url.searchParams.get("ownerWallet") ?? "";
+  const session = await getSessionForWalletSafe(id, ownerWallet);
   if (!session) {
-    return NextResponse.json(apiErrorPayload("SESSION_NOT_FOUND", "Session not found."), { status: 404 });
+    const message = ownerWallet
+      ? "This session belongs to another wallet."
+      : "Connect the session owner wallet to inspect this session.";
+    return NextResponse.json(apiErrorPayload("SESSION_NOT_FOUND", message), { status: ownerWallet ? 403 : 401 });
   }
 
   if (isApiGuardEnabled() && !isApiRequestAuthorized(request)) {

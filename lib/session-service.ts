@@ -7,6 +7,7 @@ import {
   isValidSuiObjectId,
   isValidTransactionDigest,
   normalizeSuiAddress,
+  normalizeSuiAddressForCompare,
   normalizeSuiObjectId,
 } from "@/lib/sui-client-helpers";
 
@@ -20,6 +21,8 @@ import { seedSessionInputs } from "@/lib/session-store";
 import {
   checkSupabaseSessionStore,
   getSupabaseSessionById,
+  getSupabaseSessionByIdForWallet,
+  listSupabaseSessionsForWallet,
   listSupabaseSessions,
   upsertSupabaseSession,
 } from "@/lib/sessions/supabase-session-store";
@@ -71,6 +74,16 @@ export interface SafeSessionListResult {
   warning: string | null;
   realCount: number;
   sampleFallback: boolean;
+  walletRequired?: boolean;
+  ownerWallet?: string | null;
+  stats?: SessionDashboardStats;
+}
+
+export interface SessionDashboardStats {
+  total: number;
+  walrusStored: number;
+  suiAnchored: number;
+  fullyVerified: number;
 }
 
 export interface SessionStorageDiagnostics {
@@ -109,6 +122,7 @@ export interface ProofAnchorInput {
 export class SessionValidationError extends Error {}
 
 export interface FinalizeStorageInput {
+  ownerWallet?: string;
   uploadJobId?: string;
   blobId?: string;
   blobObjectId?: string;
@@ -359,6 +373,46 @@ async function readStore() {
   return readLocalStore();
 }
 
+function normalizeOwnerWallet(value?: string | null) {
+  return normalizeSuiAddressForCompare(value);
+}
+
+function sessionBelongsToWallet(session: AgentSession, ownerWallet: string) {
+  const normalizedOwner = normalizeOwnerWallet(ownerWallet);
+  const sessionOwner = normalizeOwnerWallet(session.ownerAddress ?? session.proof.owner);
+  return Boolean(normalizedOwner && sessionOwner && normalizedOwner === sessionOwner);
+}
+
+function calculateSessionStats(sessions: AgentSession[]): SessionDashboardStats {
+  const realSessions = sessions.filter((session) => !session.isSample);
+  return {
+    total: realSessions.length,
+    walrusStored: realSessions.filter(
+      (session) => session.storage.storageProvider !== "local" && session.verification.directWalrusReadPassed,
+    ).length,
+    suiAnchored: realSessions.filter(
+      (session) => session.proof.status === "anchored" || session.proof.status === "verified",
+    ).length,
+    fullyVerified: realSessions.filter(
+      (session) => session.verification.directWalrusReadPassed && session.proof.status === "verified",
+    ).length,
+  };
+}
+
+async function readStoreForWallet(ownerWallet?: string | null) {
+  const normalizedOwner = normalizeOwnerWallet(ownerWallet);
+  if (!normalizedOwner) return [];
+
+  if (isSupabaseSessionStoreEnabled()) {
+    const sessions = await listSupabaseSessionsForWallet(normalizedOwner);
+    hydrateLocalAdapter(sessions);
+    return sessions;
+  }
+
+  const sessions = await readLocalStore();
+  return sessions.filter((session) => !session.isSample && sessionBelongsToWallet(session, normalizedOwner));
+}
+
 function parseStorageEpochs(value?: string | number) {
   const configured = value ?? process.env.WALRUS_STORAGE_EPOCHS ?? "1";
   const normalized = typeof configured === "number" ? String(configured) : configured.trim();
@@ -528,6 +582,10 @@ export async function finalizeSessionStorage(id: string, input: FinalizeStorageI
   if (!session.ownerAddress || !isValidSuiAddress(session.ownerAddress)) {
     throw new SessionValidationError("A valid session owner wallet is required.");
   }
+  const requestOwner = readStorageString(input.ownerWallet, "ownerWallet");
+  if (!isValidSuiAddress(requestOwner) || normalizeSuiAddress(requestOwner) !== normalizeSuiAddress(session.ownerAddress)) {
+    throw new SessionValidationError("The connected wallet must match the wallet that created this session.");
+  }
   if (createTraceHash(session.trace) !== session.trace.traceHash) {
     throw new SessionValidationError("Session trace hash does not match the sealed trace.");
   }
@@ -633,6 +691,11 @@ export async function listSessions() {
   return [...sessions].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+export async function listSessionsForWallet(ownerWallet?: string | null) {
+  const sessions = await readStoreForWallet(ownerWallet);
+  return [...sessions].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 export async function listSessionsSafe(): Promise<SafeSessionListResult> {
   try {
     const sessions = await listSessions();
@@ -642,6 +705,7 @@ export async function listSessionsSafe(): Promise<SafeSessionListResult> {
         warning: getServerlessSessionStoreWarning(),
         realCount: 0,
         sampleFallback: true,
+        stats: calculateSessionStats([]),
       };
     }
     return {
@@ -649,6 +713,7 @@ export async function listSessionsSafe(): Promise<SafeSessionListResult> {
       warning: getServerlessSessionStoreWarning(),
       realCount: sessions.length,
       sampleFallback: false,
+      stats: calculateSessionStats(sessions),
     };
   } catch (error) {
     return {
@@ -656,6 +721,57 @@ export async function listSessionsSafe(): Promise<SafeSessionListResult> {
       warning: formatSessionStoreWarning(error),
       realCount: 0,
       sampleFallback: true,
+      stats: calculateSessionStats([]),
+    };
+  }
+}
+
+export async function listSessionsSafeForWallet(ownerWallet?: string | null): Promise<SafeSessionListResult> {
+  const normalizedOwner = normalizeOwnerWallet(ownerWallet);
+
+  if (!normalizedOwner) {
+    return {
+      sessions: getDemoSessions(),
+      warning: null,
+      realCount: 0,
+      sampleFallback: true,
+      walletRequired: true,
+      ownerWallet: null,
+      stats: calculateSessionStats([]),
+    };
+  }
+
+  try {
+    const sessions = await listSessionsForWallet(normalizedOwner);
+    if (sessions.length === 0) {
+      return {
+        sessions: getDemoSessions(),
+        warning: getServerlessSessionStoreWarning(),
+        realCount: 0,
+        sampleFallback: true,
+        walletRequired: false,
+        ownerWallet: normalizedOwner,
+        stats: calculateSessionStats([]),
+      };
+    }
+    return {
+      sessions,
+      warning: getServerlessSessionStoreWarning(),
+      realCount: sessions.length,
+      sampleFallback: false,
+      walletRequired: false,
+      ownerWallet: normalizedOwner,
+      stats: calculateSessionStats(sessions),
+    };
+  } catch (error) {
+    return {
+      sessions: getDemoSessions(),
+      warning: formatSessionStoreWarning(error),
+      realCount: 0,
+      sampleFallback: true,
+      walletRequired: false,
+      ownerWallet: normalizedOwner,
+      stats: calculateSessionStats([]),
     };
   }
 }
@@ -673,6 +789,31 @@ export async function getSessionById(id: string) {
 export async function getSessionByIdSafe(id: string) {
   try {
     return (await getSessionById(id)) ?? getDemoSessionById(id);
+  } catch {
+    return getDemoSessionById(id);
+  }
+}
+
+export async function getSessionForWallet(id: string, ownerWallet?: string | null) {
+  const demoSession = getDemoSessionById(id);
+  if (demoSession) return demoSession;
+
+  const normalizedOwner = normalizeOwnerWallet(ownerWallet);
+  if (!normalizedOwner) return undefined;
+
+  if (isSupabaseSessionStoreEnabled()) {
+    const session = await getSupabaseSessionByIdForWallet(id, normalizedOwner);
+    if (session) hydrateLocalAdapter([session]);
+    return session;
+  }
+
+  const sessions = await readLocalStore();
+  return sessions.find((session) => session.id === id && sessionBelongsToWallet(session, normalizedOwner));
+}
+
+export async function getSessionForWalletSafe(id: string, ownerWallet?: string | null) {
+  try {
+    return await getSessionForWallet(id, ownerWallet);
   } catch {
     return getDemoSessionById(id);
   }
@@ -733,6 +874,14 @@ export async function listSessionSummariesSafe() {
   return {
     sessions: sessions.map(redactSessionSummary),
     warning,
+  };
+}
+
+export async function listSessionSummariesSafeForWallet(ownerWallet?: string | null) {
+  const result = await listSessionsSafeForWallet(ownerWallet);
+  return {
+    ...result,
+    sessions: result.sessions.map(redactSessionSummary),
   };
 }
 
