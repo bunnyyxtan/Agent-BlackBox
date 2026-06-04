@@ -10,7 +10,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (guard) return guard;
 
   const { id } = await params;
-  const result = await recheckSession(id);
+  let result: Awaited<ReturnType<typeof recheckSession>>;
+  try {
+    result = await recheckSession(id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Proof verification could not be rerun.";
+    return NextResponse.json(
+      apiErrorPayload("proof_recheck_failed", "Proof verification could not be rerun.", message),
+      { status: 500 },
+    );
+  }
   if (!result) {
     return NextResponse.json(apiErrorPayload("SESSION_NOT_FOUND", "Session not found."), { status: 404 });
   }

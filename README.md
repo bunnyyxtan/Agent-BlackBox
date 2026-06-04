@@ -28,6 +28,8 @@ Use Agent -> Generate BlackBox Trace -> Store on Walrus Mainnet -> Anchor on Sui
   references, upload references, timestamp, and status.
 - **Tatum Sui RPC** verifies proof objects, transactions, and events through server-side read-only
   routes. `TATUM_API_KEY` stays server-side.
+- **Supabase** is the durable production session store when `SUPABASE_URL` and
+  `SUPABASE_SERVICE_ROLE_KEY` are configured. Local JSON remains the development fallback.
 - **Sui Onchain Analyzer** reads Sui wallets, token balances, transactions, objects, and packages
   through Sui JSON-RPC. The active product scope is Sui + Walrus + Tatum Sui RPC.
 
@@ -121,6 +123,10 @@ OPENAI_API_KEY=<YOUR_AGENT_RUNTIME_KEY>
 TATUM_API_KEY=<YOUR_TATUM_API_KEY>
 TATUM_SUI_RPC_URL=https://sui-mainnet.gateway.tatum.io
 
+SUPABASE_URL=https://ghzvlakyufwfyxzfwigi.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<YOUR_SUPABASE_SERVICE_ROLE_KEY>
+SUPABASE_ANON_KEY=<YOUR_SUPABASE_ANON_KEY>
+
 RESEARCH_SEARCH_ENABLED=false
 RESEARCH_SEARCH_PROVIDER=
 RESEARCH_SEARCH_API_KEY=
@@ -163,9 +169,14 @@ Open `http://localhost:3000`.
 
 ## Deployment Session Storage
 
-Local development stores recorded sessions in `.data/sessions.json`. Vercel deployments do not include
-that local history and serverless local files are not durable. To keep the public dashboard useful, a
-fresh deployment shows curated sample traces until a real session is recorded in that deployment.
+Local development falls back to `.data/sessions.json` when Supabase is not configured. Vercel
+deployments should set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` so real sessions persist in the
+`agent_sessions` table. The service role key must stay server-side and must never use a
+`NEXT_PUBLIC_` prefix.
+
+Vercel deployments do not include local `.data` history, and serverless local files are not durable. To
+keep the public dashboard useful, a fresh deployment shows curated sample traces until a real session
+is recorded in Supabase or the active store.
 
 Sample traces are clearly labeled and do not claim wallet-signed Walrus or Sui proof. Production
 deployments should replace the local JSON store with durable database, KV, or object storage.
@@ -181,6 +192,7 @@ npm run build
 
 - Do not commit `.env.local`, real API keys, private keys, seed phrases, or session data.
 - Do not create `NEXT_PUBLIC_` variants of secret keys.
+- `SUPABASE_SERVICE_ROLE_KEY` is server-only and must never be used in client components.
 - Sui proof signing happens in the connected browser wallet; the server never signs transactions.
 - Tatum Sui RPC routes are read-only and allowlisted.
 - The local JSON session store is for controlled evaluation and is ignored by Git.

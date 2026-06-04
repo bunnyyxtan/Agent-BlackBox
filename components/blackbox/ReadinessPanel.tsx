@@ -27,6 +27,13 @@ interface ReadinessPayload {
     walrusNetwork: string;
     lastAgentRunStatus: string;
     lastWalrusBlobHashStatus: string;
+    sessionStorageBackend: string;
+    sessionStorageDurable: boolean;
+    supabaseUrlPresent: boolean;
+    supabaseServiceRolePresent: boolean;
+    supabaseTableReachable: boolean | null;
+    sessionStorageCheckedAt: string;
+    sessionStorageError: string | null;
   };
 }
 
@@ -48,7 +55,7 @@ function formatWalrusRelayTip(data: ReadinessPayload["data"]) {
 }
 
 function shouldRenderReadinessBadge(value: string) {
-  return /^(yes|no|ready|failed|pending|checking\.\.\.|configured|not configured|reachable|unavailable|available|not required|matched|mismatch|missing api key|package unavailable|runtime unavailable|disabled|walrus verified|sui anchored|local trace|prepared)$/i.test(value);
+  return /^(yes|no|ready|failed|pending|checking\.\.\.|configured|not configured|reachable|unavailable|available|not required|matched|mismatch|missing api key|package unavailable|runtime unavailable|disabled|walrus verified|sui anchored|local trace|prepared|supabase|local json|enabled|local only|not checked)$/i.test(value);
 }
 
 export function ReadinessPanel() {
@@ -82,6 +89,14 @@ export function ReadinessPanel() {
         { label: "Tatum Sui RPC host", value: data.tatumRpcHost, protocol: "tatum" as Protocol },
         { label: "Tatum Sui RPC API key", value: yesNo(data.tatumKeyPresent), protocol: "tatum" as Protocol },
         { label: "Tatum Sui RPC last check", value: data.tatumRpcCheckedAt, protocol: "tatum" as Protocol },
+        { label: "Session storage backend", value: data.sessionStorageBackend },
+        { label: "Durable session storage", value: data.sessionStorageDurable ? "Enabled" : "Local Only" },
+        { label: "Supabase URL present", value: yesNo(data.supabaseUrlPresent) },
+        { label: "Supabase service role", value: yesNo(data.supabaseServiceRolePresent) },
+        {
+          label: "agent_sessions reachable",
+          value: data.supabaseTableReachable === null ? "Not Checked" : yesNo(data.supabaseTableReachable),
+        },
         { label: "Walrus Upload Relay", value: formatWalrusRelayStatus(data), protocol: "walrus" as Protocol },
         { label: "Walrus relay tip", value: formatWalrusRelayTip(data), protocol: "walrus" as Protocol },
         { label: "Walrus Aggregator", value: data.walrusAggregatorConfigured ? "Configured" : "Not Configured", protocol: "walrus" as Protocol },

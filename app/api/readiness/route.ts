@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getSessionEvidenceStatus } from "@/lib/constants";
 import { getNetworkConfig } from "@/lib/network-config";
 import { guardApiRequest } from "@/lib/security/api-guard";
-import { listSessionsSafe } from "@/lib/session-service";
+import { getSessionStorageDiagnostics, listSessionsSafe } from "@/lib/session-service";
 import { getUploadRelayTipConfig } from "@/lib/storage-adapters/walrus-sdk-relay";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
 import { checkTatumSuiRpcReachability, getTatumSuiRpcConfig } from "@/lib/tatum-rpc";
@@ -59,8 +59,9 @@ export async function GET(request: Request) {
   const guard = await guardApiRequest(request, { profile: "read" });
   if (guard) return guard;
 
-  const [sessionResult, tatumReachability, relayStatus] = await Promise.all([
+  const [sessionResult, storageDiagnostics, tatumReachability, relayStatus] = await Promise.all([
     listSessionsSafe(),
+    getSessionStorageDiagnostics(),
     checkTatumSuiRpcReachability().catch((error) =>
       fallbackTatumReachability(error instanceof Error ? error.message : undefined),
     ),
@@ -100,6 +101,13 @@ export async function GET(request: Request) {
           : "Prepared"
       : "No sessions yet",
     sessionStoreWarning: sessionResult.warning,
+    sessionStorageBackend: storageDiagnostics.backend,
+    sessionStorageDurable: storageDiagnostics.durable,
+    supabaseUrlPresent: storageDiagnostics.supabaseUrlPresent,
+    supabaseServiceRolePresent: storageDiagnostics.supabaseServiceRolePresent,
+    supabaseTableReachable: storageDiagnostics.tableReachable,
+    sessionStorageCheckedAt: storageDiagnostics.lastCheck,
+    sessionStorageError: storageDiagnostics.lastError,
   };
   const response: ApiSuccessResponse<typeof result> = {
     ok: true,

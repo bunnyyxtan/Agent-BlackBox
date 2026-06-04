@@ -5,6 +5,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { ProtocolLogo, type Protocol } from "@/components/ui/ProtocolLogo";
 import { formatStatusLabel, StatusBadge } from "@/components/ui/StatusBadge";
 import { getNetworkConfig } from "@/lib/network-config";
+import { getSessionStorageDiagnostics } from "@/lib/session-service";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
 import { getTatumSuiRpcConfig } from "@/lib/tatum-rpc";
 import { getWalrusConfiguration, getWalrusNetworkLabel } from "@/lib/walrus";
@@ -30,6 +31,11 @@ const SETTINGS_BADGE_LABELS = new Set([
   "Tatum Sui RPC",
   "Tatum Sui RPC network",
   "Tatum Sui RPC network match",
+  "Session storage backend",
+  "Durable session storage",
+  "Supabase URL present",
+  "Supabase service role present",
+  "Supabase table reachable",
   "Walrus network",
 ]);
 
@@ -43,6 +49,7 @@ export default async function SettingsPage() {
   const walrus = getWalrusConfiguration();
   const proofRegistry = getSuiProofRegistryConfig();
   const tatumRpc = getTatumSuiRpcConfig();
+  const storageDiagnostics = await getSessionStorageDiagnostics();
   const rows = [
     { label: "Agent Runtime", value: env.OPENAI_API_KEY ? "Configured" : "Not Configured" },
     { label: "Tatum Sui RPC", value: tatumRpc.configured ? "Configured" : "Not Configured", protocol: "tatum" as Protocol },
@@ -50,6 +57,14 @@ export default async function SettingsPage() {
     { label: "Tatum Sui RPC URL host", value: tatumRpc.rpcHost, protocol: "tatum" as Protocol },
     { label: "Tatum Sui RPC network match", value: tatumRpc.rpcNetworkMismatch ? "Mismatch" : "Matched", protocol: "tatum" as Protocol },
     { label: "Tatum API key present", value: tatumRpc.apiKeyConfigured ? "Yes" : "No", protocol: "tatum" as Protocol },
+    { label: "Session storage backend", value: storageDiagnostics.backend },
+    { label: "Durable session storage", value: storageDiagnostics.durable ? "Enabled" : "Local Only" },
+    { label: "Supabase URL present", value: storageDiagnostics.supabaseUrlPresent ? "Yes" : "No" },
+    { label: "Supabase service role present", value: storageDiagnostics.supabaseServiceRolePresent ? "Yes" : "No" },
+    {
+      label: "Supabase table reachable",
+      value: storageDiagnostics.tableReachable === null ? "Not Checked" : storageDiagnostics.tableReachable ? "Yes" : "No",
+    },
     { label: "Storage Method", value: formatStorageMethod(walrus.provider), protocol: "walrus" as Protocol },
     { label: "Sui network", value: network.displayNetwork, protocol: "sui" as Protocol },
     { label: "Sui Proof Contract", value: proofRegistry.configured ? "Configured" : "Not Configured", protocol: "sui" as Protocol },
@@ -113,12 +128,14 @@ export default async function SettingsPage() {
         </div>
       </GlassCard>
 
-      <GlassCard className="mt-5 border-amber-200/15 bg-amber-200/[0.035] p-4">
-        <p className="text-xs leading-5 text-slate-400">
-          Local session storage is for controlled evaluation only and is not serverless-safe. Production deployments
-          should use durable authenticated storage plus encrypted trace handling.
-        </p>
-      </GlassCard>
+      {!storageDiagnostics.durable ? (
+        <GlassCard className="mt-5 border-amber-200/15 bg-amber-200/[0.035] p-4">
+          <p className="text-xs leading-5 text-slate-400">
+            Local session storage is for controlled evaluation only and is not serverless-safe. Configure Supabase
+            for durable production session storage.
+          </p>
+        </GlassCard>
+      ) : null}
     </>
   );
 }

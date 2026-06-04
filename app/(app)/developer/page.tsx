@@ -3,7 +3,7 @@ import { Boxes, Database, Network, Waves } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { listSessionsSafe } from "@/lib/session-service";
+import { getSessionStorageDiagnostics, listSessionsSafe } from "@/lib/session-service";
 import { getUploadRelayTipConfig } from "@/lib/storage-adapters/walrus-sdk-relay";
 import { checkTatumSuiRpcReachability, getTatumSuiRpcConfig } from "@/lib/tatum-rpc";
 import { getWalrusConfiguration, getWalrusNetworkLabel } from "@/lib/walrus";
@@ -79,10 +79,11 @@ function getTatumRpcStatus(
 }
 
 export default async function DeveloperPage() {
-  const [tatumRpcReachability, walrusRelay, sessionState] = await Promise.all([
+  const [tatumRpcReachability, walrusRelay, sessionState, storageDiagnostics] = await Promise.all([
     checkTatumSuiRpcReachability(),
     getUploadRelayTipConfig(),
     listSessionsSafe(),
+    getSessionStorageDiagnostics(),
   ]);
   const tatumRpc = getTatumSuiRpcConfig();
   const walrus = getWalrusConfiguration();
@@ -105,8 +106,15 @@ export default async function DeveloperPage() {
     ["Last check", walrusRelay.checkedAt],
   ];
   const sessionStorageRows = [
-    ["Storage backend", process.env.VERCEL === "1" ? "Local JSON on serverless temp storage" : "Local JSON"],
-    ["Durable on Vercel", "No"],
+    ["Storage backend", storageDiagnostics.backend],
+    ["Durable on Vercel", storageDiagnostics.durableOnVercel ? "Yes" : "No"],
+    ["Supabase URL present", yesNo(storageDiagnostics.supabaseUrlPresent)],
+    ["Service role present", yesNo(storageDiagnostics.supabaseServiceRolePresent)],
+    ["Anon key present", yesNo(storageDiagnostics.supabaseAnonKeyPresent)],
+    ["Supabase host", storageDiagnostics.supabaseHost],
+    ["agent_sessions reachable", storageDiagnostics.tableReachable === null ? "Not checked" : yesNo(storageDiagnostics.tableReachable)],
+    ["Last storage check", storageDiagnostics.lastCheck],
+    ["Last storage error", storageDiagnostics.lastError ?? "None"],
     ["Real sessions loaded", String(sessionState.realCount)],
     ["Sample fallback", sessionState.sampleFallback ? "Active" : "Inactive"],
     [
@@ -115,7 +123,7 @@ export default async function DeveloperPage() {
         ? "Dashboard shows curated sample traces until a real session is recorded."
         : "Dashboard is showing recorded sessions from the active local store.",
     ],
-    ["Production recommendation", "Configure durable database, KV, or object storage."],
+    ["Production recommendation", storageDiagnostics.recommendation],
   ];
   return (
     <>
@@ -233,7 +241,7 @@ export default async function DeveloperPage() {
               </div>
             </div>
             <div className="flex shrink-0 justify-start sm:justify-end">
-              <StatusBadge status={sessionState.sampleFallback ? "Sample Fallback" : "Recording Sessions"} />
+              <StatusBadge status={storageDiagnostics.durable ? "Supabase" : sessionState.sampleFallback ? "Sample Fallback" : "Local JSON"} />
             </div>
           </div>
           <dl className="mt-4 space-y-3 text-xs">

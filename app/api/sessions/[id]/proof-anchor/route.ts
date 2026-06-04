@@ -102,6 +102,10 @@ export async function POST(
     if (error instanceof SessionValidationError) {
       return NextResponse.json(apiErrorPayload("SESSION_VALIDATION_FAILED", error.message), { status: 400 });
     }
-    throw error;
+    const message = error instanceof Error ? error.message : "Sui proof anchor could not be persisted.";
+    return NextResponse.json(
+      apiErrorPayload("proof_anchor_failed", "Sui proof anchor could not be persisted.", message),
+      { status: 500 },
+    );
   }
 }

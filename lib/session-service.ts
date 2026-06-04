@@ -17,11 +17,18 @@ import { getDemoSessionById, getDemoSessions } from "@/lib/demo-sessions";
 import { createHashFromString, createResultHash, createTraceHash } from "@/lib/hash";
 import { getNetworkConfig, normalizeSuiNetwork } from "@/lib/network-config";
 import { seedSessionInputs } from "@/lib/session-store";
+import {
+  checkSupabaseSessionStore,
+  getSupabaseSessionById,
+  listSupabaseSessions,
+  upsertSupabaseSession,
+} from "@/lib/sessions/supabase-session-store";
 import { getStorageAdapter, storeTraceBundleWithFallback } from "@/lib/storage-adapters";
 import { hydrateLocalStoredTrace } from "@/lib/storage-adapters/local";
 import { hydrateWalrusStorageReference } from "@/lib/storage-adapters/walrus-direct";
 import { hydrateWalrusSdkRelayStorageReference } from "@/lib/storage-adapters/walrus-sdk-relay";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
+import { getSupabaseStorageStatus } from "@/lib/supabase/server";
 import {
   buildLocalPhase1TatumRpcVerification,
   verifyProofMetadata,
@@ -64,6 +71,21 @@ export interface SafeSessionListResult {
   warning: string | null;
   realCount: number;
   sampleFallback: boolean;
+}
+
+export interface SessionStorageDiagnostics {
+  backend: "Supabase" | "Local JSON";
+  mode: "supabase" | "local-json";
+  durable: boolean;
+  durableOnVercel: boolean;
+  supabaseUrlPresent: boolean;
+  supabaseServiceRolePresent: boolean;
+  supabaseAnonKeyPresent: boolean;
+  supabaseHost: string;
+  tableReachable: boolean | null;
+  lastCheck: string;
+  lastError: string | null;
+  recommendation: string;
 }
 
 interface NormalizedSessionInput extends CreateSessionInput {
@@ -228,11 +250,16 @@ function shouldWriteSeedSessions() {
 }
 
 function getServerlessSessionStoreWarning() {
+  if (getSupabaseStorageStatus().configured) return null;
   if (!isVercelRuntime()) return null;
   return "This deployment is using local JSON session storage, which is not durable on Vercel. The page will stay available, but production sessions need durable storage.";
 }
 
 function formatSessionStoreWarning(error: unknown) {
+  if (getSupabaseStorageStatus().configured) {
+    const message = error instanceof Error ? error.message : "Supabase session storage is unavailable.";
+    return `Supabase session storage is unavailable. ${message}`.replace(/\s+/g, " ").trim().slice(0, 500);
+  }
   const code =
     typeof error === "object" && error !== null && "code" in error
       ? String((error as NodeJS.ErrnoException).code)
@@ -297,7 +324,11 @@ async function ensureSeedSessionCoverage(sessions: AgentSession[]) {
   return nextSessions;
 }
 
-async function readStore() {
+function isSupabaseSessionStoreEnabled() {
+  return getSupabaseStorageStatus().configured;
+}
+
+async function readLocalStore() {
   try {
     const raw = await readFile(STORE_PATH, "utf8");
     const payload = JSON.parse(raw) as SessionStoreFile;
@@ -317,6 +348,15 @@ async function readStore() {
     hydrateLocalAdapter(sessions);
     return sessions;
   }
+}
+
+async function readStore() {
+  if (isSupabaseSessionStoreEnabled()) {
+    const sessions = await listSupabaseSessions();
+    hydrateLocalAdapter(sessions);
+    return sessions;
+  }
+  return readLocalStore();
 }
 
 function parseStorageEpochs(value?: string | number) {
@@ -371,8 +411,13 @@ function normalizeCreateInput(input: CreateAgentSessionRequest): NormalizedSessi
 }
 
 async function persistSession(session: AgentSession) {
+  if (isSupabaseSessionStoreEnabled()) {
+    await upsertSupabaseSession(session);
+    hydrateLocalAdapter([session]);
+    return session;
+  }
   return withStoreMutation(async () => {
-    const sessions = await readStore();
+    const sessions = await readLocalStore();
     await writeStore([session, ...sessions.filter((item) => item.id !== session.id)]);
     return session;
   });
@@ -616,6 +661,11 @@ export async function listSessionsSafe(): Promise<SafeSessionListResult> {
 }
 
 export async function getSessionById(id: string) {
+  if (isSupabaseSessionStoreEnabled()) {
+    const session = await getSupabaseSessionById(id);
+    if (session) hydrateLocalAdapter([session]);
+    return session;
+  }
   const sessions = await readStore();
   return sessions.find((session) => session.id === id);
 }
@@ -893,7 +943,9 @@ export async function verifySession(id: string): Promise<LocalVerificationReport
 export async function recheckSession(id: string) {
   const report = await verifySession(id);
   if (!report) return undefined;
-  await persistSession(report.session);
+  if (!report.session.isSample) {
+    await persistSession(report.session);
+  }
   return report;
 }
 
@@ -935,6 +987,45 @@ export async function hydrateSessionStore() {
   } catch (error) {
     return { ok: false, warning: formatSessionStoreWarning(error) };
   }
+}
+
+export async function getSessionStorageDiagnostics(): Promise<SessionStorageDiagnostics> {
+  const status = getSupabaseStorageStatus();
+  const checkedAt = new Date().toISOString();
+  if (!status.configured) {
+    return {
+      backend: "Local JSON",
+      mode: "local-json",
+      durable: false,
+      durableOnVercel: false,
+      supabaseUrlPresent: status.urlPresent,
+      supabaseServiceRolePresent: status.serviceRolePresent,
+      supabaseAnonKeyPresent: status.anonKeyPresent,
+      supabaseHost: status.host,
+      tableReachable: null,
+      lastCheck: checkedAt,
+      lastError: null,
+      recommendation: "Configure Supabase for durable Vercel session storage.",
+    };
+  }
+
+  const check = await checkSupabaseSessionStore();
+  return {
+    backend: "Supabase",
+    mode: "supabase",
+    durable: true,
+    durableOnVercel: true,
+    supabaseUrlPresent: status.urlPresent,
+    supabaseServiceRolePresent: status.serviceRolePresent,
+    supabaseAnonKeyPresent: status.anonKeyPresent,
+    supabaseHost: status.host,
+    tableReachable: check.tableReachable,
+    lastCheck: check.checkedAt,
+    lastError: check.error,
+    recommendation: check.tableReachable
+      ? "Supabase session storage is ready."
+      : "Check the agent_sessions table, service role key, and Supabase project URL.",
+  };
 }
 
 export async function getStorageReferenceByBlobId(blobId: string) {
