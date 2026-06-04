@@ -5,6 +5,9 @@ import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
 import { APP_NAME } from "@/lib/constants";
 
 const COPYRIGHT_YEAR = 2026;
+const DOCUMENTATION_URL = "https://github.com/bunnyyxtan/Agent-BlackBox/tree/main/docs";
+const GITHUB_URL = "https://github.com/bunnyyxtan/Agent-BlackBox.git";
+const BUILDER_URL = "https://x.com/Bunnyyxtan";
 
 export function Footer() {
   return (
@@ -49,16 +52,29 @@ export function Footer() {
             <h4 className="text-sm font-semibold text-white">Resources</h4>
             <ul className="space-y-3">
               <li><Link href="/developer" prefetch className="text-sm font-light text-zinc-400 hover:text-indigo-400 transition-colors">Developers</Link></li>
-              <li><a href="#" className="text-sm font-light text-zinc-400 hover:text-indigo-400 transition-colors">Documentation</a></li>
-              <li><a href="#" className="text-sm font-light text-zinc-400 hover:text-indigo-400 transition-colors">GitHub</a></li>
+              <li><a href={DOCUMENTATION_URL} target="_blank" rel="noreferrer" className="text-sm font-light text-zinc-400 hover:text-indigo-400 transition-colors">Documentation</a></li>
+              <li><a href={GITHUB_URL} target="_blank" rel="noreferrer" className="text-sm font-light text-zinc-400 hover:text-indigo-400 transition-colors">GitHub</a></li>
             </ul>
           </div>
         </div>
 
         <div className="flex flex-col items-start justify-between gap-4 border-t border-white/5 pt-8 md:flex-row md:items-center">
-          <p className="text-xs font-light text-zinc-500">
-            &copy; {COPYRIGHT_YEAR} Agent BlackBox. All rights reserved.
-          </p>
+          <div className="space-y-2">
+            <p className="text-xs font-light text-zinc-500">
+              &copy; {COPYRIGHT_YEAR} Agent BlackBox. All rights reserved.
+            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white">
+              Built By -{" "}
+              <a
+                href={BUILDER_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-300 transition-colors hover:text-white"
+              >
+                Bunnyyxtan
+              </a>
+            </p>
+          </div>
           
           {/* Proof Stack */}
           <div className="flex flex-wrap items-center gap-3 sm:gap-6">
