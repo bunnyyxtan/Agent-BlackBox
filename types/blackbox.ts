@@ -231,6 +231,24 @@ export interface AgentSession {
   verification: VerificationResult;
 }
 
+export type SessionListItem = Pick<
+  AgentSession,
+  | "id"
+  | "isSample"
+  | "sampleLabel"
+  | "title"
+  | "agentMode"
+  | "createdAt"
+  | "updatedAt"
+  | "status"
+  | "storage"
+  | "walrusVerification"
+  | "proof"
+  | "verification"
+> & {
+  trace: Pick<AgentSession["trace"], "traceHash">;
+};
+
 export interface CreateSessionInput {
   id?: string;
   rerunOf?: string;

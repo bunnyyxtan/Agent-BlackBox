@@ -4,9 +4,9 @@ import Link from "next/link";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AGENT_MODE_LABELS, formatDate, getSessionEvidenceStatus, shortHash } from "@/lib/constants";
-import type { AgentSession } from "@/types/blackbox";
+import type { SessionListItem } from "@/types/blackbox";
 
-export function SessionCard({ session }: { session: AgentSession }) {
+export function SessionCard({ session }: { session: SessionListItem }) {
   return (
     <GlassCard className="card-hover flex h-full min-w-0 flex-col p-5 transition hover:border-indigo-500/30 hover:bg-white/[0.04]">
       <div className="flex items-start justify-between gap-3">

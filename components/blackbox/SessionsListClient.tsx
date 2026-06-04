@@ -1,8 +1,8 @@
 import { SessionCard } from "@/components/blackbox/SessionCard";
 import { GlassCard } from "@/components/ui/GlassCard";
-import type { AgentSession } from "@/types/blackbox";
+import type { SessionListItem } from "@/types/blackbox";
 
-export function SessionsListClient({ sessions, limit }: { sessions: AgentSession[]; limit?: number }) {
+export function SessionsListClient({ sessions, limit }: { sessions: SessionListItem[]; limit?: number }) {
   if (sessions.length === 0) {
     return (
       <GlassCard className="p-5">

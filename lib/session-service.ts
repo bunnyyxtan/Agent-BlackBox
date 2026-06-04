@@ -43,6 +43,7 @@ import type {
   CreateAgentSessionRequest,
   CreateSessionInput,
   LocalVerificationReport,
+  SessionListItem,
   StorageMode,
   StorageReference,
   VerificationResult,
@@ -862,6 +863,26 @@ export function redactSessionSummary(session: AgentSession) {
       hashMatched: session.verification.hashMatched,
       checkedAt: session.verification.checkedAt,
     },
+  };
+}
+
+export function toSessionListItem(session: AgentSession): SessionListItem {
+  return {
+    id: session.id,
+    isSample: session.isSample,
+    sampleLabel: session.sampleLabel,
+    title: session.title,
+    agentMode: session.agentMode,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    status: session.status,
+    trace: {
+      traceHash: session.trace.traceHash,
+    },
+    storage: session.storage,
+    walrusVerification: session.walrusVerification,
+    proof: session.proof,
+    verification: session.verification,
   };
 }
 

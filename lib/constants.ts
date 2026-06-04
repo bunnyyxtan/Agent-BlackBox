@@ -1,4 +1,4 @@
-import type { AgentMode, AgentSession, StorageStatus } from "@/types/blackbox";
+import type { AgentMode, AgentSession, SessionListItem, StorageStatus } from "@/types/blackbox";
 import { buildSuiExplorerUrl } from "@/lib/sui-explorer";
 
 export const APP_NAME = "Agent BlackBox";
@@ -97,7 +97,7 @@ export function formatBytes(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function getSessionEvidenceStatus(session: AgentSession) {
+export function getSessionEvidenceStatus(session: AgentSession | SessionListItem) {
   if (session.isSample) return "Sample Trace";
   if (
     session.verification.directWalrusReadPassed &&

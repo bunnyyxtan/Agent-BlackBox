@@ -12,7 +12,7 @@ import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
 import { StatCard } from "@/components/ui/StatCard";
 import { WalletConnectButton } from "@/components/ui/WalletConnectButton";
 import { readJsonResponse } from "@/lib/http/safe-json";
-import type { AgentSession } from "@/types/blackbox";
+import type { SessionListItem } from "@/types/blackbox";
 
 interface SessionStats {
   total: number;
@@ -25,7 +25,7 @@ interface WalletSessionsState {
   loading: boolean;
   error: string;
   message: string;
-  sessions: AgentSession[];
+  sessions: SessionListItem[];
   stats: SessionStats;
   realCount: number;
   sampleFallback: boolean;
@@ -33,16 +33,26 @@ interface WalletSessionsState {
 }
 
 interface WalletSessionsPayload {
+  sessions?: SessionListItem[];
+  source?: "supabase" | "local-json" | "demo";
+  ownerWallet?: string | null;
+  isWalletScoped?: boolean;
+  stats?: SessionStats;
+  realCount?: number;
+  sampleFallback?: boolean;
+  walletRequired?: boolean;
   message?: string;
   data?: {
-    sessions: AgentSession[];
+    sessions: SessionListItem[];
+    source?: "supabase" | "local-json" | "demo";
+    ownerWallet?: string | null;
+    isWalletScoped?: boolean;
     stats: SessionStats;
     realCount: number;
     sampleFallback: boolean;
     walletRequired: boolean;
-    ownerWallet: string | null;
   };
-  error?: {
+  error?: string | {
     message?: string;
   };
 }
@@ -53,6 +63,35 @@ const EMPTY_STATS: SessionStats = {
   suiAnchored: 0,
   fullyVerified: 0,
 };
+
+const SESSION_LIST_RESPONSE_MAX_BYTES = 6 * 1024 * 1024;
+
+function readPayloadError(error: WalletSessionsPayload["error"]) {
+  if (!error) return "";
+  return typeof error === "string" ? error : error.message ?? "";
+}
+
+function parseWalletSessionsPayload(payload: WalletSessionsPayload) {
+  const data = payload.data ?? payload;
+
+  if (!Array.isArray(data.sessions)) {
+    console.error("Malformed /api/sessions response: expected a sessions array.", {
+      keys: Object.keys(payload ?? {}),
+      preview: JSON.stringify(payload).slice(0, 500),
+    });
+    throw new Error("Wallet sessions response was malformed.");
+  }
+
+  return {
+    sessions: data.sessions,
+    stats: data.stats ?? EMPTY_STATS,
+    realCount: data.realCount ?? data.sessions.filter((session) => !session.isSample).length,
+    sampleFallback: Boolean(data.sampleFallback),
+    walletRequired: Boolean(data.walletRequired),
+    message: payload.message ?? "",
+    error: readPayloadError(payload.error),
+  };
+}
 
 function useWalletScopedSessions() {
   const account = useCurrentAccount();
@@ -89,16 +128,17 @@ function useWalletScopedSessions() {
     }));
 
     fetch(endpoint, { signal: controller.signal })
-      .then((response) => readJsonResponse<WalletSessionsPayload>(response, `GET ${endpoint}`))
+      .then((response) =>
+        readJsonResponse<WalletSessionsPayload>(response, `GET ${endpoint}`, {
+          maxBytes: SESSION_LIST_RESPONSE_MAX_BYTES,
+        }),
+      )
       .then((payload) => {
-        const data = payload.data;
-        if (!data) {
-          throw new Error(payload.error?.message ?? payload.message ?? "Wallet sessions could not be loaded.");
-        }
+        const data = parseWalletSessionsPayload(payload);
         setState({
           loading: false,
-          error: "",
-          message: payload.message ?? "",
+          error: data.error ?? "",
+          message: data.message,
           sessions: data.sessions,
           stats: data.stats ?? EMPTY_STATS,
           realCount: data.realCount,

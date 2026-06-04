@@ -4,7 +4,7 @@ export interface SafeJsonResponseErrorOptions {
   statusText: string;
   contentType: string;
   snippet: string;
-  reason: "invalid_content_type" | "invalid_json";
+  reason: "invalid_content_type" | "invalid_json" | "response_too_large";
 }
 
 export class SafeJsonResponseError extends Error {
@@ -18,9 +18,11 @@ export class SafeJsonResponseError extends Error {
 
   constructor(options: SafeJsonResponseErrorOptions) {
     super(
-      `Invalid response from ${options.endpoint}. Status: ${options.status} ${options.statusText}. Content-Type: ${
-        options.contentType || "not reported"
-      }.`,
+      options.reason === "response_too_large"
+        ? `Response from ${options.endpoint} exceeded the safe JSON size limit.`
+        : `Invalid response from ${options.endpoint}. Status: ${options.status} ${options.statusText}. Content-Type: ${
+            options.contentType || "not reported"
+          }.`,
     );
     this.name = "SafeJsonResponseError";
     this.endpoint = options.endpoint;
@@ -61,7 +63,7 @@ async function readResponseTextWithLimit(response: Response, endpoint: string, m
         statusText: response.statusText,
         contentType: response.headers.get("content-type") ?? "",
         snippet: "",
-        reason: "invalid_json",
+        reason: "response_too_large",
       });
     }
     chunks.push(value);
@@ -76,9 +78,13 @@ async function readResponseTextWithLimit(response: Response, endpoint: string, m
   return new TextDecoder().decode(merged);
 }
 
-export async function readJsonResponse<T>(response: Response, endpoint: string): Promise<T> {
+export async function readJsonResponse<T>(
+  response: Response,
+  endpoint: string,
+  options: { maxBytes?: number } = {},
+): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";
-  const text = await readResponseTextWithLimit(response, endpoint);
+  const text = await readResponseTextWithLimit(response, endpoint, options.maxBytes);
   const snippet = firstSnippet(text);
 
   if (!isJsonContentType(contentType)) {
