@@ -9,7 +9,7 @@ import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
 import { formatStatusLabel, StatusBadge } from "@/components/ui/StatusBadge";
 import { AGENT_MODE_LABELS, formatDate, getSessionEvidenceStatus, shortHash } from "@/lib/constants";
 import { buildSuiExplorerUrl } from "@/lib/sui-explorer";
-import { formatProofStatus, formatTatumRpcStatus } from "@/lib/tatum-rpc-labels";
+import { formatProofStatus } from "@/lib/tatum-rpc-labels";
 import type { AgentFindingSeverity } from "@/lib/agents/types";
 import type {
   SpecialistAgentReport,
@@ -847,7 +847,7 @@ export function AgentReportPanel({
 
         </div>
 
-        <div className="grid min-w-0 gap-5 lg:grid-cols-3">
+        <div className="grid min-w-0 items-start gap-5 lg:grid-cols-3">
           <section className="min-w-0 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
               Session Snapshot
@@ -925,7 +925,6 @@ export function AgentReportPanel({
                         : "Pending",
                 },
                 { label: "Sui anchor", status: formatProofStatus(session.proof.status) },
-                { label: "Tatum RPC", status: formatTatumRpcStatus(session.tatumRpc.status) },
               ].map((item) => (
                 <div key={item.label} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <span className="text-xs text-slate-500">{item.label}</span>

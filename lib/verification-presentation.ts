@@ -71,7 +71,7 @@ export function getVerificationPresentation(
       title: "Verified Trace",
       status: "Verified Trace",
       description:
-        "Replay payload hash matches the sealed proof hash. Additional Sui and Tatum proof details are shown below.",
+        "Replay payload hash matches the sealed proof hash, and Sui proof details are shown below.",
     };
   }
 

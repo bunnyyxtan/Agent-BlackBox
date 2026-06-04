@@ -4,7 +4,6 @@ import { CopyButton } from "@/components/ui/CopyButton";
 import { ProtocolLogo, type Protocol } from "@/components/ui/ProtocolLogo";
 import { shortHash } from "@/lib/constants";
 import { getSuiProofRegistryConfig } from "@/lib/sui-proof";
-import { formatTatumRpcStatus } from "@/lib/tatum-rpc-labels";
 import { getVerificationPresentation } from "@/lib/verification-presentation";
 import type { AgentSession } from "@/types/blackbox";
 
@@ -19,10 +18,6 @@ function getProofAnchorStatus(session: AgentSession) {
   if (session.proof.status === "anchored_pending_object") return "Pending Sui Anchor";
   if (session.proof.status === "failed") return "Failed";
   return "Not anchored";
-}
-
-function shouldShowTatumRpcCard(session: AgentSession) {
-  return session.tatumRpc.status === "passed" || session.tatumRpc.status === "transaction_found";
 }
 
 export function VerificationGrid({ session }: { session: AgentSession }) {
@@ -49,7 +44,7 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
       : session.storage.noRenewal
         ? "Cancelled"
         : "Active";
-  const baseItems: Array<{
+  const items: Array<{
     detail: string;
     icon: string;
     label: string;
@@ -75,19 +70,6 @@ export function VerificationGrid({ session }: { session: AgentSession }) {
     },
     { label: "Expiry / Renewal", status: expiryStatus, icon: "solar:history-line-duotone", detail: session.storage.expiryDate, protocol: "walrus" },
   ];
-  const items = shouldShowTatumRpcCard(session)
-    ? [
-        ...baseItems.slice(0, 5),
-        {
-          label: "Tatum RPC Check",
-          status: formatTatumRpcStatus(session.tatumRpc.status),
-          icon: "solar:server-square-line-duotone",
-          detail: session.tatumRpc.message,
-          protocol: "tatum" as const,
-        },
-        ...baseItems.slice(5),
-      ]
-    : baseItems;
 
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-4">

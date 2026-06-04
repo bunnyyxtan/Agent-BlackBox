@@ -23,7 +23,7 @@ import { ProtocolLogo } from "@/components/ui/ProtocolLogo";
 import { formatStatusLabel, StatusBadge } from "@/components/ui/StatusBadge";
 import { AGENT_MODE_LABELS, formatDate, getSessionEvidenceStatus, shortHash } from "@/lib/constants";
 import { buildSuiExplorerUrl } from "@/lib/sui-explorer";
-import { formatProofStatus, formatTatumRpcStatus } from "@/lib/tatum-rpc-labels";
+import { formatProofStatus } from "@/lib/tatum-rpc-labels";
 import type { AgentSession } from "@/types/blackbox";
 
 const AnchorProofPanel = dynamic<{ session: AgentSession }>(
@@ -217,7 +217,7 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
           </div>
         </GlassCard>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.72fr)]">
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.72fr)]">
           <GlassCard className="p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-start gap-3">
@@ -278,13 +278,6 @@ export function SessionDetailClient({ session }: { session: AgentSession }) {
                 label="Transaction digest"
                 value={formatPendingPlaceholder(session.proof.transactionDigest)}
               />
-              <div className="flex items-center justify-between gap-2 py-3">
-                <span className="inline-flex items-center gap-2 text-xs text-slate-500">
-                  <ProtocolLogo protocol="tatum" size="sm" />
-                  Tatum RPC verification
-                </span>
-                <StatusBadge status={formatTatumRpcStatus(session.tatumRpc.status)} />
-              </div>
             </div>
             {suiTransactionUrl ? (
               <a

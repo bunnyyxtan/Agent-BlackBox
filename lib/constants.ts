@@ -99,8 +99,8 @@ export function formatBytes(value: number) {
 
 export function getSessionEvidenceStatus(session: AgentSession) {
   if (
-    session.verification.tatumRpcPassed &&
     session.verification.directWalrusReadPassed &&
+    session.verification.hashMatched === true &&
     session.proof.status === "verified"
   ) {
     return "Fully Verified";
