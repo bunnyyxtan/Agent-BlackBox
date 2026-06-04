@@ -187,6 +187,6 @@ npm run build
 ## References
 
 - [`docs/sui-proof-registry.md`](docs/sui-proof-registry.md)
-- [`docs/contract-plan.md`](docs/contract-plan.md)
 - [`docs/agent-runtime.md`](docs/agent-runtime.md)
 - [`docs/walrus-mainnet-sdk-relay.md`](docs/walrus-mainnet-sdk-relay.md)
+- [`docs/INTEGRATION_VALUES_CHECKLIST.md`](docs/INTEGRATION_VALUES_CHECKLIST.md)

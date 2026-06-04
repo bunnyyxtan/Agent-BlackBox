@@ -126,8 +126,6 @@ NEXT_PUBLIC_SUI_PROOF_MODULE=agent_blackbox
 SUI_PROOF_CREATE_FUNCTION=create_session_proof
 NEXT_PUBLIC_SUI_PROOF_CREATE_FUNCTION=create_session_proof
 
-TATUM_STORAGE_API_URL=
-TATUM_STORAGE_PROVIDER=walrus
 ```
 
 ## 8. Optional Developer Testnet Override

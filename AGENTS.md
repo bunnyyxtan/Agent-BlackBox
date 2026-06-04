@@ -13,9 +13,9 @@ to a feature checklist.
 Also read:
 
 - `README.md` for setup, implemented routes, and current scaffold status.
-- `docs/sui-proof-registry.md` for the implemented Sui Move proof registry guide.
+- `docs/sui-proof-registry.md` for the deployed Sui proof registry and anchoring flow.
 - `docs/agent-runtime.md` for the server-side Agent Runtime and trace-output contract.
-- `docs/contract-plan.md` for the broader contract roadmap.
+- `docs/walrus-mainnet-sdk-relay.md` for the Walrus Mainnet SDK Upload Relay flow.
 - The existing code before making assumptions about the current implementation phase.
 
 ## Walrus-First Architecture Correction
@@ -231,7 +231,7 @@ Use Sui for lightweight proof metadata:
 - Creation timestamp
 - Verification status
 
-The planned `AgentSessionProof` object, events, and functions are described in `docs/contract-plan.md`.
+The deployed `AgentSessionProof` object, event, and function are described in `docs/sui-proof-registry.md`.
 
 ### 5. Proof Reads: Tatum Sui RPC
 
@@ -513,7 +513,7 @@ includes the primary UI routes, typed models, local deterministic trace generati
 server-side development session service, neutral storage-adapter boundaries, local trace-bundle
 storage and hash verification, direct-Walrus and optional Tatum-managed Walrus adapter boundaries,
 server-side API routes, the verification report, storage views, hash-based tamper simulation,
-`.env.example`, `README.md`, and `docs/contract-plan.md`. Browser `localStorage` is not the canonical
+`.env.example`, `README.md`, and `docs/sui-proof-registry.md`. Browser `localStorage` is not the canonical
 session store, and unknown IDs return not-found responses instead of sample evidence.
 
 Before changing anything, inspect the repository and confirm this status is still accurate. Update this
@@ -585,7 +585,7 @@ If the answer is mostly no, it is probably outside the Agent BlackBox vision.
 
 ## Collaboration Rules for Future AI Agents
 
-- Read this file, `README.md`, and `docs/contract-plan.md` before implementation work.
+- Read this file, `README.md`, and `docs/sui-proof-registry.md` before implementation work.
 - Inspect the current repository state before assuming a phase is incomplete.
 - Follow the PRD closely and keep changes scoped to the requested phase.
 - Keep components reusable and TypeScript types consistent.
