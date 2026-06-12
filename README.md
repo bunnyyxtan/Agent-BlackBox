@@ -20,7 +20,7 @@ Use Agent -> Generate BlackBox Trace -> Store on Walrus Mainnet -> Anchor on Sui
 
 ## Architecture
 
-- **Agent Runtime** runs server-side, produces structured reports, and stores only user-safe
+- **Agent Runtime** runs server-side, produces structured reports, and stores only user safe
   summaries in the trace. `OPENAI_API_KEY` is never exposed to the client.
 - **Walrus Mainnet** is the canonical blob-storage layer. The default upload path uses the official
   Walrus SDK Upload Relay with connected-wallet payment and direct aggregator readback.
