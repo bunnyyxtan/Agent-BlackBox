@@ -165,14 +165,14 @@ Developers can opt into testnet only by explicitly setting `NEXT_PUBLIC_SUI_NETW
 `SUI_NETWORK=testnet`, and `WALRUS_NETWORK=testnet` with matching endpoints and a testnet proof
 package.
 
-## Local Setup
+## Local setup
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+The dev server prints its local URL. The production deployment runs at [agent-blackbox.vercel.app](https://agent-blackbox.vercel.app).
 
 ## Deployment Session Storage
 
