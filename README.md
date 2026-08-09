@@ -2,6 +2,13 @@
 
 > The flight recorder for autonomous AI agents.
 
+<p>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license" /></a>
+  <img src="https://img.shields.io/badge/storage-Walrus%20Mainnet-0b7285" alt="Walrus Mainnet" />
+  <img src="https://img.shields.io/badge/anchor-Sui%20Mainnet-4da2ff" alt="Sui Mainnet" />
+  <img src="https://img.shields.io/badge/app-Next.js-000000" alt="Next.js" />
+</p>
+
 Agent BlackBox records an AI-agent task as a hash-verified proof bundle: the original user intent,
 file metadata, agent plan, tool-call summaries, final report, deterministic hashes, Walrus storage
 references, Sui proof-anchor metadata, and verification results.
