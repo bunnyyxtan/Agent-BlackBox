@@ -1,17 +1,28 @@
-node_modules
-.next
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
 .env
 .env.local
 .env.*.local
 .env.production
-.vercel
-dist
-build
-tsconfig.tsbuildinfo
 
-generated-page.html
-out.html
-replace.js
-
-move/**/build/
+# Runtime data
 .data/
+
+# Move build artifacts
+move/**/build/
+
+# Deployment
+.vercel
+
+# OS / editor
+.DS_Store
+*.log
